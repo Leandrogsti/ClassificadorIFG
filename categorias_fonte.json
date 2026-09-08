@@ -1,0 +1,80 @@
+{
+  "_leia_me": "Fonte editável das categorias de motivação. Para adicionar uma categoria nova, copie um bloco, preencha 'nome' (slug), 'definicao' (texto livre e completo, o quanto quiser: o gerar_dicionario.py extrai as palavras-chave automaticamente via spaCy) e 'nao_e' (frase curta de desambiguação manual). Depois rode: python gerar_dicionario.py",
+  "categorias": [
+    {
+      "nome": "arrastao",
+      "definicao": "Roubos ou tentativas de roubo contra múltiplas vítimas ou grupos independentes, na mesma ação contínua, no mesmo tempo e local.",
+      "nao_e": "Ônibus/van não é arrastão, é roubo_tentativa. Roubos em série com intervalo de tempo são roubos separados, não arrastão."
+    },
+    {
+      "nome": "ataque_a_civis",
+      "definicao": "Disparos direcionados intencionalmente a um local de uso coletivo ou de circulação pública, como bar, escola, praça ou transporte, com ou sem vítimas atingidas.",
+      "nao_e": "Bala perdida de confronto alheio segue o confronto de origem. Execução de um alvo específico sem rajada geral é homicidio_tentativa. Assalto com tiro só para intimidar é roubo_tentativa."
+    },
+    {
+      "nome": "sequestro_carcere_privado",
+      "definicao": "Privação de liberdade é o centro da dinâmica do crime, com disparo envolvido.",
+      "nao_e": "Só é sequestro se houver retenção além do necessário para o roubo, ou deslocamento forçado da vítima. Refém liberado logo em seguida é roubo_tentativa comum. Refém tomado durante a fuga de outro crime: esse outro crime é o principal, sequestro entra como complementar."
+    },
+    {
+      "nome": "tortura",
+      "definicao": "Sinais objetivos de sofrimento antes da morte ou dos disparos finais: vítima imobilizada, amarrada ou algemada, tiros em membros como forma de punição, espancamento, queimaduras ou mutilação.",
+      "nao_e": "Execução letal sem imobilização prévia, mesmo com muitos tiros, é homicidio_tentativa. Tiro na perna durante fuga ou troca de tiros pertence ao confronto de origem, não é tortura. Um item roubado encontrado perto do corpo ou usado na fuga dos autores não descarta tortura."
+    },
+    {
+      "nome": "acao_operacao_policial",
+      "definicao": "Disparos que ocorrem no momento em que agentes de segurança em serviço estão atuando na cena, trocando tiros ou sendo alvo: polícia militar, civil, federal, rodoviária, guarda municipal armada, força nacional, agentes penitenciários ou forças armadas. Ação é uma resposta de rotina; operação é planejada, com múltiplas equipes ou unidades.",
+      "nao_e": "É principal quando a própria ação ou operação origina os tiros; é complementar quando os agentes reagem a tiros de um crime em andamento na hora, trocando tiros ou sendo alvo. Agentes que chegam só depois, para atender uma ocorrência já encerrada, socorrer vítima, apreender arma/corpo ou investigar, NÃO entram nesta categoria — é preciso ter disparo envolvendo os agentes no momento do fato, não depois dele. Um suspeito ser alvo de operação policial contra tráfico/armas em outro momento, sem relação com o disparo em si, também não entra aqui. Agente de folga, suicídio de agente ou acidente com a própria arma do agente também não entram nesta categoria."
+    },
+    {
+      "nome": "disputa",
+      "definicao": "Confronto entre grupos armados rivais, como facções ou milícias, ou ataque de um grupo contra outro ou contra território rival, sem agentes de segurança participando do confronto.",
+      "nao_e": "Com polícia presente no confronto, a categoria vira acao_operacao_policial (principal se foi a operação que originou os tiros, complementar se a disputa entre grupos que originou). Conflito interpessoal comum é briga. Execução de um alvo específico sem confronto entre grupos é homicidio_tentativa."
+    },
+    {
+      "nome": "briga",
+      "definicao": "Desentendimento interpessoal, por exemplo no trânsito, em bar, festa, entre vizinhos ou entre parceiros, que escala para disparo de arma de fogo.",
+      "nao_e": "Entre grupos armados disputando território é disputa, não briga. Uma briga que na verdade é uma tentativa de roubo é roubo_tentativa. Violência doméstica com crueldade deliberada é tortura."
+    },
+    {
+      "nome": "homicidio_tentativa",
+      "definicao": "O motivo dos disparos é matar ou tentar matar uma pessoa determinada, como em execução, emboscada ou atentado, quando não há outro motivo explícito relatado.",
+      "nao_e": "Uma dinâmica de emboscada ou execução, em que os autores interceptam ou abordam a vítima especificamente, atiram e fogem, já caracteriza intenção de matar mesmo sem o motivo por trás ser conhecido. Com imobilização ou punição prévia é tortura. Com rajada de tiros em espaço coletivo é ataque_a_civis."
+    },
+    {
+      "nome": "roubo_tentativa",
+      "definicao": "Roubo ou tentativa de roubo de bens contra uma ou poucas pessoas, contra comércio ou contra veículo particular, com disparo de arma de fogo. Exclui roubo a banco, roubo de cargas e a dinâmica coletiva do arrastão.",
+      "nao_e": "Inclui assalto em ônibus ou van, e a chamada saidinha de banco quando o alvo é a pessoa que acabou de sacar dinheiro, não a agência bancária."
+    },
+    {
+      "nome": "roubo_a_banco",
+      "definicao": "Roubo ou tentativa de roubo contra instituição bancária ou caixa eletrônico, com disparo de arma de fogo. Inclui explosão de caixa eletrônico acompanhada de disparo, e o chamado novo cangaço.",
+      "nao_e": "Cliente assaltado ao sair do banco é roubo_tentativa comum, não roubo_a_banco. Ataque a carro-forte é roubo_de_cargas, não roubo_a_banco."
+    },
+    {
+      "nome": "roubo_de_cargas",
+      "definicao": "Roubo ou tentativa de roubo de carga transportada, em caminhão, carro-forte, embarcação ou centro de distribuição, com disparo de arma de fogo. Ataque a carro-forte é sempre roubo_de_cargas.",
+      "nao_e": "Interesse apenas no veículo vazio, sem a carga, é roubo_tentativa comum."
+    },
+    {
+      "nome": "suicidio",
+      "definicao": "Disparo contra si mesmo, consumado ou tentado, incluindo o caso de agente de segurança fora de ação policial.",
+      "nao_e": "Homicídio seguido do suicídio do autor: homicidio_tentativa é o principal, suicídio entra como complementar. Indício de terceira pessoa envolvida na morte é homicidio_tentativa, não suicídio. Disparo autoinfligido sem intenção de morte é disparo_acidental."
+    },
+    {
+      "nome": "disparo_acidental",
+      "definicao": "Disparo involuntário, por manuseio indevido da arma, limpeza, queda da arma no chão ou criança manipulando a arma.",
+      "nao_e": "Bala perdida de um confronto sempre segue o confronto de origem, nunca é disparo_acidental. Tiro para comemorar é tiros_a_esmo, porque é intencional, não involuntário."
+    },
+    {
+      "nome": "tiros_a_esmo",
+      "definicao": "Disparo intencional sem alvo definido, como tiro para o alto ou tiro de comemoração.",
+      "nao_e": "Se ferir alguém por acaso, continua sendo tiros_a_esmo. Disparo dirigido a uma pessoa é homicidio_tentativa. Disparo dirigido a um espaço coletivo é ataque_a_civis. Disparo involuntário é disparo_acidental."
+    },
+    {
+      "nome": "rebeliao_fuga_presos",
+      "definicao": "Disparos dentro de um presídio ou no seu entorno, motivados por rebelião interna ou fuga de presos, incluindo o confronto com agentes durante a contenção.",
+      "nao_e": "Briga entre agentes penitenciários dentro da unidade é briga ou homicidio_tentativa, não esta categoria. Suicídio de um detento é suicídio. Fuga que vira perseguição fora do presídio soma acao_operacao_policial como complementar."
+    }
+  ]
+}
