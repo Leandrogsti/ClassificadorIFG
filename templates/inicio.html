@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<div class="entre">
+  <div>
+    <h1>Ocorrências</h1>
+    <p class="suave">
+      {{ ocorrencias|length }} registro(s).
+      {% if alertas_abertos %}
+        <a href="{{ url_for('alertas') }}">{{ alertas_abertos }} alerta(s) de duplicidade em aberto</a>.
+      {% endif %}
+    </p>
+  </div>
+  <a href="{{ url_for('nova_ocorrencia') }}"><button>Nova ocorrência</button></a>
+</div>
+
+<div class="cartao">
+  <form method="get" class="linha">
+    <div>
+      <label for="status">Filtrar por status</label>
+      <select id="status" name="status" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for chave, rotulo in rotulos_status.items() %}
+          {% if chave != 'unificada' %}
+            <option value="{{ chave }}" {% if status_filtro == chave %}selected{% endif %}>{{ rotulo }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+</div>
+
+<div class="cartao">
+  {% if not ocorrencias %}
+    <p class="suave">Nenhuma ocorrência ainda. Comece abrindo uma nova.</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Data do fato</th><th>Local</th><th>Indicadores</th>
+        <th>Notícias</th><th>Vítimas</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in ocorrencias %}
+      <tr>
+        <td><a href="{{ url_for('ocorrencia', ocorrencia_id=o.id) }}">{{ o.id }}</a></td>
+        <td>{{ o.data_fato }}</td>
+        <td>{{ o.cidade }} — {{ o.bairro }}{% if o.localidade %}<br><span class="suave">{{ o.localidade }}</span>{% endif %}</td>
+        <td>
+          {% for i in o.indicadores %}<span class="etiqueta">{{ rotulos_indicadores.get(i, i) }}</span>{% endfor %}
+          {% if not o.indicadores %}<span class="suave">—</span>{% endif %}
+        </td>
+        <td>{{ o.total_noticias }}</td>
+        <td>{{ o.total_vitimas }}</td>
+        <td><span class="status status-{{ o.status }}">{{ rotulos_status.get(o.status, o.status) }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

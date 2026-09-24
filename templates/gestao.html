@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<h1>Gestão de indicadores e skills</h1>
+<p class="suave">
+  Permite ampliar o sistema sem mexer no código. Indicadores de <strong>regra</strong>
+  são calculados sobre a lista de vítimas; os de <strong>texto</strong> usam a skill
+  abaixo na validação pela LLM e exigem exemplos rotulados para retreinar o BERTimbau.
+</p>
+
+<div class="cartao">
+  <h2>Indicadores cadastrados ({{ indicadores|length }})</h2>
+  <table>
+    <thead><tr><th>Nome</th><th>Tipo</th><th>Definição</th><th></th></tr></thead>
+    <tbody>
+      {% for i in indicadores %}
+      <tr>
+        <td>
+          <strong>{{ i.rotulo }}</strong><br>
+          <span class="suave">{{ i.nome }}</span>
+        </td>
+        <td><span class="etiqueta {{ i.tipo }}">{{ i.tipo }}</span></td>
+        <td>
+          {{ i.definicao }}
+          {% if i.skill %}<details><summary>Skill da LLM</summary><p class="suave">{{ i.skill }}</p></details>{% endif %}
+          {% if i.regra %}<p class="suave">Regra: {{ i.regra.operacao }} · campo {{ i.regra.campo }} · valor {{ i.regra.valor }}{% if i.regra.minimo %} · mínimo {{ i.regra.minimo }}{% endif %}</p>{% endif %}
+          {% if i.exemplos %}<details><summary>{{ i.exemplos|length }} exemplo(s) rotulado(s)</summary><ul class="suave">{% for e in i.exemplos %}<li>{{ e }}</li>{% endfor %}</ul></details>{% endif %}
+        </td>
+        <td class="direita">
+          <form method="post" action="{{ url_for('excluir_indicador', nome=i.nome) }}">
+            <button class="perigo" type="submit">Excluir</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="cartao">
+  <h2>Cadastrar ou editar indicador</h2>
+  <p class="suave">Usar um nome já existente substitui o indicador atual.</p>
+  <form method="post">
+    <div class="linha">
+      <div>
+        <label for="nome">Nome (slug)</label>
+        <input id="nome" name="nome" required placeholder="crianca_adolescente_baleado">
+      </div>
+      <div>
+        <label for="rotulo">Rótulo exibido</label>
+        <input id="rotulo" name="rotulo" placeholder="Criança ou adolescente baleado">
+      </div>
+      <div>
+        <label for="tipo">Tipo</label>
+        <select id="tipo" name="tipo">
+          <option value="texto">texto (BERTimbau + skill da LLM)</option>
+          <option value="regra">regra (sobre as vítimas)</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label for="definicao">Definição</label>
+      <textarea id="definicao" name="definicao" rows="2" required></textarea>
+    </div>
+
+    <div id="bloco-texto" style="margin-top:12px">
+      <label for="skill">Skill — instruções que a LLM usa para confirmar o indicador</label>
+      <textarea id="skill" name="skill" rows="4"></textarea>
+      <label for="exemplos" style="margin-top:10px">Exemplos rotulados (um por linha) — usados para retreinar o BERTimbau</label>
+      <textarea id="exemplos" name="exemplos" rows="3"></textarea>
+    </div>
+
+    <div id="bloco-regra" style="margin-top:12px; display:none">
+      <div class="linha">
+        <div>
+          <label for="operacao">Operação</label>
+          <select id="operacao" name="operacao">
+            <option value="campo_igual">campo_igual</option>
+            <option value="campo_menor_que">campo_menor_que</option>
+            <option value="campo_preenchido">campo_preenchido</option>
+            <option value="contagem_minima">contagem_minima</option>
+          </select>
+        </div>
+        <div>
+          <label for="campo">Campo da vítima</label>
+          <select id="campo" name="campo">
+            {% for c in ['idade', 'genero', 'tipo_vitima', 'situacao', 'cargo_politico', 'bala_perdida'] %}
+              <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="valor">Valor</label>
+          <input id="valor" name="valor" placeholder="feminino / 18 / morta">
+        </div>
+        <div>
+          <label for="minimo">Mínimo (só para contagem_minima)</label>
+          <input id="minimo" name="minimo" type="number" min="1" placeholder="3">
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" style="margin-top:14px">Salvar indicador</button>
+  </form>
+</div>
+
+<script>
+  const tipo = document.getElementById("tipo");
+  const blocoTexto = document.getElementById("bloco-texto");
+  const blocoRegra = document.getElementById("bloco-regra");
+
+  tipo.addEventListener("change", () => {
+    const eTexto = tipo.value === "texto";
+    blocoTexto.style.display = eTexto ? "block" : "none";
+    blocoRegra.style.display = eTexto ? "none" : "block";
+  });
+</script>
+{% endblock %}

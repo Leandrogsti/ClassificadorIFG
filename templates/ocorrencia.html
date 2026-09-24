@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% macro campos_vitima(v, prefixo) %}
+  <div class="linha">
+    <div>
+      <label>Nome</label>
+      <input name="nome" value="{{ v.nome or '' }}" placeholder="sem nome">
+    </div>
+    <div>
+      <label>Idade</label>
+      <input name="idade" type="number" min="0" max="120" value="{{ v.idade if v.idade is not none else '' }}">
+    </div>
+    <div>
+      <label>Gênero</label>
+      <select name="genero">
+        {% for opcao in ['feminino', 'masculino', 'nao_informado'] %}
+          <option value="{{ opcao }}" {% if v.genero == opcao %}selected{% endif %}>{{ opcao.replace('_', ' ') }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Tipo de vítima</label>
+      <select name="tipo_vitima">
+        {% for opcao in ['civil', 'agente_seguranca', 'politico', 'suspeito', 'nao_informado'] %}
+          <option value="{{ opcao }}" {% if v.tipo_vitima == opcao %}selected{% endif %}>{{ opcao.replace('_', ' ') }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="linha" style="margin-top:10px">
+    <div>
+      <label>Situação</label>
+      <select name="situacao">
+        {% for opcao in ['ferida', 'morta', 'ilesa'] %}
+          <option value="{{ opcao }}" {% if v.situacao == opcao %}selected{% endif %}>{{ opcao }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Data da morte</label>
+      <input name="data_morte" type="date" value="{{ v.data_morte or '' }}">
+    </div>
+    <div>
+      <label>Cargo / candidatura política</label>
+      <input name="cargo_politico" value="{{ v.cargo_politico or '' }}">
+    </div>
+    <div>
+      <label>Bala perdida</label>
+      <select name="bala_perdida">
+        <option value="0" {% if not v.bala_perdida %}selected{% endif %}>não</option>
+        <option value="1" {% if v.bala_perdida %}selected{% endif %}>sim</option>
+      </select>
+    </div>
+  </div>
+  <div class="linha" style="margin-top:10px">
+    <div style="flex:2">
+      <label>Circunstância</label>
+      <input name="circunstancia" value="{{ v.circunstancia or '' }}">
+    </div>
+    <div>
+      <label>Fonte</label>
+      <input name="fonte" value="{{ v.fonte or '' }}" placeholder="Notícia 1">
+    </div>
+  </div>
+{% endmacro %}
+
+{% block conteudo %}
+<div class="entre">
+  <div>
+    <h1>Ocorrência #{{ ocorrencia.id }}</h1>
+    <p class="suave">
+      {{ ocorrencia.data_fato }} · {{ ocorrencia.cidade }} — {{ ocorrencia.bairro }}
+      {% if ocorrencia.localidade %} · {{ ocorrencia.localidade }}{% endif %}
+      · analista {{ ocorrencia.analista }} · cadastrada em {{ ocorrencia.criado_em[:16].replace('T', ' ') }}
+    </p>
+  </div>
+  <span class="status status-{{ ocorrencia.status }}">{{ rotulos_status.get(ocorrencia.status, ocorrencia.status) }}</span>
+</div>
+
+{% if ocorrencia.observacao_aprovacao and ocorrencia.status == 'nao_aprovado' %}
+  <p class="aviso aviso-aviso">Devolvido pela aprovação: {{ ocorrencia.observacao_aprovacao }}</p>
+{% endif %}
+
+{% if alertas %}
+  <p class="aviso aviso-aviso">
+    Há {{ alertas|length }} alerta(s) de duplicidade em aberto para este registro.
+    <a href="{{ url_for('alertas') }}">Verificar</a>. A aprovação fica bloqueada até a resolução.
+  </p>
+{% endif %}
+
+<div class="cartao">
+  <h2>Classificação</h2>
+  <div class="linha">
+    <div>
+      <label>Motivo principal</label>
+      <strong>{{ ocorrencia.motivo_principal or '—' }}</strong>
+    </div>
+    <div>
+      <label>Motivos complementares</label>
+      {% for m in ocorrencia.motivos_complementares %}<span class="etiqueta">{{ m }}</span>{% endfor %}
+      {% if not ocorrencia.motivos_complementares %}<span class="suave">nenhum</span>{% endif %}
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <label>Indicadores</label>
+    {% for i in ocorrencia.indicadores %}
+      <span class="etiqueta {{ 'texto' if i in ocorrencia.indicadores_texto else 'regra' }}">
+        {{ rotulos_indicadores.get(i, i) }}
+      </span>
+    {% endfor %}
+    {% if not ocorrencia.indicadores %}<span class="suave">nenhum</span>{% endif %}
+    <p class="suave">Verde: calculado por regra sobre as vítimas. Roxo: classificado a partir do texto.</p>
+  </div>
+
+  {% if ocorrencia.divergencias %}
+    <div class="proposta">
+      <strong>Divergências entre as fontes:</strong>
+      <ul>{% for d in ocorrencia.divergencias %}<li>{{ d }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+</div>
+
+<div class="cartao">
+  <h2>Inclusão de notícia</h2>
+  <p class="suave">
+    Cole o link e o texto. A cada OK, todas as notícias desta ocorrência são
+    relidas juntas e a lista de vítimas é refeita do zero — nunca somada.
+  </p>
+  <form method="post" action="{{ url_for('adicionar_noticia', ocorrencia_id=ocorrencia.id) }}">
+    <label for="link">Link</label>
+    <input id="link" name="link" style="width:100%" placeholder="https://...">
+    <label for="texto" style="margin-top:10px">Texto da notícia (obrigatório)</label>
+    <textarea id="texto" name="texto" rows="8" required placeholder="Cole aqui o texto da notícia"></textarea>
+    <button type="submit" style="margin-top:10px">OK — processar</button>
+  </form>
+</div>
+
+<div class="cartao">
+  <div class="entre">
+    <h2>Notícias da ocorrência ({{ noticias|length }})</h2>
+    {% if noticias %}
+      <form method="post" action="{{ url_for('reprocessar', ocorrencia_id=ocorrencia.id) }}">
+        <button class="secundario" type="submit">Reprocessar tudo</button>
+      </form>
+    {% endif %}
+  </div>
+  {% if not noticias %}
+    <p class="suave">Nenhuma notícia ainda.</p>
+  {% endif %}
+  {% for n in noticias %}
+    <details style="margin-bottom:10px">
+      <summary>
+        Notícia {{ loop.index }}
+        {% if n.link %} — {{ n.link[:70] }}{% endif %}
+        <span class="suave">({{ n.texto|length }} caracteres, {{ n.texto_processado|length }} após o pré-processamento)</span>
+      </summary>
+      {% if n.link %}<p><a href="{{ n.link }}" target="_blank" rel="noopener">Abrir a fonte</a></p>{% endif %}
+      <div class="noticia-texto">{{ n.texto }}</div>
+      <form method="post" action="{{ url_for('excluir_noticia', noticia_id=n.id) }}" style="margin-top:8px">
+        <button class="perigo" type="submit">Remover notícia</button>
+      </form>
+    </details>
+  {% endfor %}
+</div>
+
+<div class="cartao">
+  <h2>Verificação das vítimas ({{ vitimas|length }})</h2>
+  <p class="suave">
+    Confira e corrija o que for preciso. As correções são mantidas nos
+    processamentos seguintes, e cada alteração recalcula os indicadores.
+  </p>
+
+  {% if not vitimas %}
+    <p class="suave">Nenhuma vítima identificada até aqui.</p>
+  {% endif %}
+
+  {% for v in vitimas %}
+    <div class="cartao" style="background:#fbfcfd">
+      <div class="entre">
+        <h3>
+          {{ v.nome or 'Vítima sem nome' }}
+          <span class="etiqueta">{{ v.situacao }}</span>
+          {% if v.editado_manualmente %}<span class="etiqueta regra">corrigida pelo analista</span>{% endif %}
+        </h3>
+        <form method="post" action="{{ url_for('excluir_vitima', vitima_id=v.id) }}">
+          <button class="perigo" type="submit">Remover</button>
+        </form>
+      </div>
+
+      {% if v.divergencia %}
+        <p class="proposta"><strong>Fontes divergem:</strong> {{ v.divergencia }}</p>
+      {% endif %}
+
+      {% if v.proposta %}
+        <div class="proposta">
+          <strong>A LLM propõe mudanças a partir das notícias:</strong>
+          <ul>
+            {% for campo, valor in v.proposta.items() %}
+              <li>{{ campo }}: <strong>{{ valor if valor is not none else 'vazio' }}</strong> (atual: {{ v[campo] if v[campo] is not none else 'vazio' }})</li>
+            {% endfor %}
+          </ul>
+          <form method="post" action="{{ url_for('resolver_proposta', vitima_id=v.id, acao='aceitar') }}" style="display:inline">
+            <button type="submit">Aceitar</button>
+          </form>
+          <form method="post" action="{{ url_for('resolver_proposta', vitima_id=v.id, acao='descartar') }}" style="display:inline">
+            <button class="secundario" type="submit">Manter minha correção</button>
+          </form>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('editar_vitima', vitima_id=v.id) }}" style="margin-top:10px">
+        {{ campos_vitima(v, 'v') }}
+        <div class="linha" style="margin-top:10px">
+          <div style="flex:2">
+            <label>Fonte ou justificativa da alteração</label>
+            <input name="fonte_alteracao" placeholder="Ex.: notícia do dia 12 confirma a morte">
+          </div>
+          <div style="align-self:end">
+            <button type="submit">Salvar alteração</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  {% endfor %}
+
+  <details>
+    <summary>Incluir vítima manualmente</summary>
+    <form method="post" action="{{ url_for('criar_vitima', ocorrencia_id=ocorrencia.id) }}">
+      {{ campos_vitima({}, 'nova') }}
+      <button type="submit" style="margin-top:10px">Incluir vítima</button>
+    </form>
+  </details>
+</div>
+
+<div class="cartao">
+  <div class="entre">
+    <div>
+      <h2>Concluir</h2>
+      <p class="suave">
+        Grava o registro com status "não aprovado", calcula os indicadores de
+        regra sobre a lista final e dispara a checagem de duplicidade.
+      </p>
+    </div>
+    <form method="post" action="{{ url_for('concluir', ocorrencia_id=ocorrencia.id) }}">
+      <button type="submit">Concluir e enviar para aprovação</button>
+    </form>
+  </div>
+</div>
+
+{% if historico %}
+<div class="cartao">
+  <details>
+    <summary>Histórico de alterações ({{ historico|length }})</summary>
+    <table>
+      <thead><tr><th>Quando</th><th>Campo</th><th>Antes</th><th>Depois</th><th>Quem</th><th>Fonte</th></tr></thead>
+      <tbody>
+        {% for h in historico %}
+        <tr>
+          <td>{{ h.alterado_em[:16].replace('T', ' ') }}</td>
+          <td>{{ h.campo }}</td>
+          <td>{{ h.valor_anterior or '—' }}</td>
+          <td>{{ h.valor_novo or '—' }}</td>
+          <td>{{ h.alterado_por }}</td>
+          <td>{{ h.fonte or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</div>
+{% endif %}
+{% endblock %}

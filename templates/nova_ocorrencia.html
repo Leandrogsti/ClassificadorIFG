@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<h1>Abertura da ocorrência</h1>
+<p class="suave">Etapa 1: informe a data e o endereço. As notícias entram na tela seguinte.</p>
+
+<div class="cartao">
+  <form method="post">
+    <div class="linha">
+      <div>
+        <label for="data_fato">Data do fato</label>
+        <input type="date" id="data_fato" name="data_fato" required>
+      </div>
+      <div>
+        <label for="analista">Analista</label>
+        <input id="analista" name="analista" value="{{ analista }}" placeholder="Seu nome" required>
+      </div>
+    </div>
+
+    <div class="linha" style="margin-top:12px">
+      <div>
+        <label for="cidade">Cidade</label>
+        <select id="cidade" name="cidade" required>
+          <option value="">Selecione</option>
+          {% for cidade in locais %}<option value="{{ cidade }}">{{ cidade }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="bairro">Bairro</label>
+        <select id="bairro" name="bairro" required disabled>
+          <option value="">Selecione a cidade primeiro</option>
+        </select>
+      </div>
+      <div>
+        <label for="localidade">Localidade (opcional)</label>
+        <input id="localidade" name="localidade" placeholder="Rua, comunidade, ponto de referência">
+      </div>
+    </div>
+
+    <p class="suave" style="margin-top:12px">
+      Cidade e bairro vêm de listas fixas: grafias diferentes para o mesmo lugar
+      quebrariam o alerta de duplicidade e as estatísticas.
+    </p>
+
+    <button type="submit" style="margin-top:8px">Abrir ocorrência</button>
+  </form>
+</div>
+
+<script>
+  const bairrosPorCidade = {{ locais|tojson }};
+  const cidade = document.getElementById("cidade");
+  const bairro = document.getElementById("bairro");
+
+  cidade.addEventListener("change", () => {
+    const lista = bairrosPorCidade[cidade.value] || [];
+    bairro.innerHTML = '<option value="">Selecione</option>';
+    for (const nome of lista) {
+      const opcao = document.createElement("option");
+      opcao.value = nome;
+      opcao.textContent = nome;
+      bairro.appendChild(opcao);
+    }
+    bairro.disabled = lista.length === 0;
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<h1>Alertas de duplicidade</h1>
+<p class="suave">
+  A checagem roda em paralelo, sem travar o cadastro: depois que uma ocorrência
+  é gravada, o sistema procura outros registros no mesmo dia e bairro da mesma
+  cidade. Unificar não apaga nada e pode ser desfeito.
+</p>
+
+{% if not alertas %}
+  <div class="cartao"><p class="suave">Nenhum alerta registrado.</p></div>
+{% endif %}
+
+{% for a in alertas %}
+<div class="cartao">
+  <div class="entre">
+    <div>
+      <h2>
+        Ocorrência <a href="{{ url_for('ocorrencia', ocorrencia_id=a.ocorrencia_id) }}">#{{ a.ocorrencia_id }}</a>
+        e <a href="{{ url_for('ocorrencia', ocorrencia_id=a.ocorrencia_similar_id) }}">#{{ a.ocorrencia_similar_id }}</a>
+      </h2>
+      <p class="suave">
+        {{ a.data_fato }} · {{ a.cidade }} — {{ a.bairro }} ·
+        analistas: {{ a.analista_a }} e {{ a.analista_b }}
+      </p>
+    </div>
+    <span class="status status-{{ 'nao_aprovado' if a.status == 'aberto' else 'aprovado' }}">{{ a.status }}</span>
+  </div>
+
+  {% if a.status == 'aberto' %}
+    <div class="linha">
+      <form method="post" action="{{ url_for('resolver_alerta', alerta_id=a.id, acao='unificar') }}" style="flex:1">
+        <label>É o mesmo fato — juntar os registros</label>
+        <div class="linha">
+          <input name="motivo" style="flex:2" placeholder="Por que são o mesmo fato">
+          <button type="submit">Unificar</button>
+        </div>
+      </form>
+      <form method="post" action="{{ url_for('resolver_alerta', alerta_id=a.id, acao='descartar') }}" style="flex:1">
+        <label>São fatos diferentes — descartar o alerta</label>
+        <div class="linha">
+          <input name="motivo" style="flex:2" placeholder="Por que são fatos distintos">
+          <button class="secundario" type="submit">Descartar</button>
+        </div>
+      </form>
+    </div>
+  {% else %}
+    <p class="suave">
+      Resolvido por {{ a.resolvido_por or '—' }} em {{ (a.resolvido_em or '')[:16].replace('T', ' ') }}.
+      {% if a.motivo %}Motivo: {{ a.motivo }}{% endif %}
+    </p>
+    {% if a.status == 'unificado' %}
+      <form method="post" action="{{ url_for('resolver_alerta', alerta_id=a.id, acao='desfazer') }}">
+        <button class="secundario" type="submit">Desfazer unificação</button>
+      </form>
+    {% endif %}
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Classificador de Violência Armada{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header class="topo">
+    <a class="marca" href="{{ url_for('inicio') }}">Classificador de Violência Armada</a>
+    <nav>
+      <a href="{{ url_for('inicio') }}">Ocorrências</a>
+      <a href="{{ url_for('aprovacao') }}">Aprovação</a>
+      <a href="{{ url_for('alertas') }}">Alertas</a>
+      <a href="{{ url_for('acompanhamento') }}">Acompanhamento</a>
+      <a href="{{ url_for('gestao') }}">Gestão</a>
+    </nav>
+    <form class="analista" method="post" action="{{ url_for('definir_analista') }}">
+      <input name="analista" value="{{ analista }}" placeholder="Seu nome (analista)" required>
+      <button type="submit">Entrar</button>
+    </form>
+  </header>
+
+  <main>
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+      {% if mensagens %}
+        {% for categoria, mensagem in mensagens %}
+          <p class="aviso aviso-{{ categoria }}">{{ mensagem }}</p>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block conteudo %}{% endblock %}
+  </main>
+</body>
+</html>

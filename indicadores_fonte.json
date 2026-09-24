@@ -1,0 +1,73 @@
+{
+  "_leia_me": "Fonte editável dos indicadores. Tipo 'regra' é calculado pelo sistema sobre a lista final de vítimas; tipo 'texto' é classificado a partir das notícias (BERTimbau + skill da LLM). A aplicação de gestão (/gestao) edita este arquivo. Indicadores novos de tipo 'texto' também exigem exemplos rotulados para retreinar o BERTimbau.",
+  "indicadores": [
+    {
+      "nome": "crianca_adolescente_baleado",
+      "rotulo": "Criança ou adolescente baleado",
+      "tipo": "regra",
+      "definicao": "Vítima baleada com menos de 18 anos, conforme o ECA (Lei 8.069/1990).",
+      "regra": { "operacao": "campo_menor_que", "campo": "idade", "valor": 18 }
+    },
+    {
+      "nome": "mulheres_baleadas",
+      "rotulo": "Mulheres baleadas",
+      "tipo": "regra",
+      "definicao": "Vítima baleada do gênero feminino.",
+      "regra": { "operacao": "campo_igual", "campo": "genero", "valor": "feminino" }
+    },
+    {
+      "nome": "vitimizacao_policial",
+      "rotulo": "Vitimização policial",
+      "tipo": "regra",
+      "definicao": "Vítima baleada que é agente de segurança, em serviço ou de folga.",
+      "regra": { "operacao": "campo_igual", "campo": "tipo_vitima", "valor": "agente_seguranca" }
+    },
+    {
+      "nome": "politico_baleado",
+      "rotulo": "Político baleado",
+      "tipo": "regra",
+      "definicao": "Vítima baleada com cargo eletivo, função política ou candidatura.",
+      "regra": { "operacao": "campo_preenchido", "campo": "cargo_politico" }
+    },
+    {
+      "nome": "chacina",
+      "rotulo": "Chacina",
+      "tipo": "regra",
+      "definicao": "Três ou mais pessoas mortas na mesma ocorrência.",
+      "regra": { "operacao": "contagem_minima", "campo": "situacao", "valor": "morta", "minimo": 3 }
+    },
+    {
+      "nome": "acao_policial",
+      "rotulo": "Ação policial",
+      "tipo": "texto",
+      "definicao": "Agentes de segurança em serviço atuando na cena no momento do disparo, trocando tiros ou sendo alvo.",
+      "skill": "Marque acao_policial somente se agentes de segurança estavam presentes e atuando NO MOMENTO do disparo (trocando tiros ou sendo alvo). Polícia que chega depois para socorrer, periciar, apreender arma/corpo ou investigar NÃO conta. Agente de folga reagindo a assalto conta. Citação de operação policial em outro contexto ou em outro momento não conta.",
+      "exemplos": [
+        "Durante operação do Bope na comunidade, houve troca de tiros e dois suspeitos morreram.",
+        "PM de folga reagiu ao assalto e atirou contra os criminosos."
+      ]
+    },
+    {
+      "nome": "crime_organizado",
+      "rotulo": "Crime organizado",
+      "tipo": "texto",
+      "definicao": "Envolvimento de facção, milícia ou grupo armado estruturado na dinâmica do disparo, incluindo disputa de território.",
+      "skill": "Marque crime_organizado quando o texto indicar facção, milícia, tráfico organizado, grupo armado estruturado ou disputa de território como parte da dinâmica do disparo. Menção genérica a 'bandidos' ou 'criminosos' sem estrutura de grupo NÃO basta. Antecedentes do envolvido, sem relação com o disparo, também não bastam.",
+      "exemplos": [
+        "Os disparos são atribuídos à disputa entre facções rivais pelo controle do território.",
+        "A milícia local teria ordenado o ataque contra o comerciante."
+      ]
+    },
+    {
+      "nome": "violencia_genero",
+      "rotulo": "Violência de gênero",
+      "tipo": "texto",
+      "definicao": "Disparo motivado pela condição de gênero da vítima, incluindo feminicídio e violência doméstica praticada por parceiro ou ex-parceiro.",
+      "skill": "Marque violencia_genero quando o disparo for motivado pela condição de gênero da vítima: feminicídio, violência doméstica ou familiar, agressão por parceiro ou ex-parceiro, ciúme, separação, perseguição. Mulher atingida por bala perdida ou em assalto comum NÃO é violência de gênero — é preciso que o gênero seja o motivo.",
+      "exemplos": [
+        "O ex-companheiro a perseguiu até o trabalho e atirou após ela pedir a separação.",
+        "A vítima tinha medida protetiva contra o autor dos disparos."
+      ]
+    }
+  ]
+}

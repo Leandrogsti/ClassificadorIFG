@@ -1,0 +1,8 @@
+flask>=3.1
+groq>=1.7
+python-dotenv>=1.2
+spacy>=3.8
+
+# Só necessário para ativar o filtro BERTimbau (BERTIMBAU_MODELO no .env)
+transformers>=5.0
+torch>=2.0

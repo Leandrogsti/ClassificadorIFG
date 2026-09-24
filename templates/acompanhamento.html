@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<h1>Acompanhamento de feridos</h1>
+<p class="suave">
+  Vítimas feridas dos últimos {{ dias }} dias ficam em checagem periódica, porque
+  a situação pode mudar semanas depois. Passado o prazo, a edição continua
+  possível pela tela da ocorrência.
+</p>
+
+<div class="cartao">
+  {% if not vitimas %}
+    <p class="suave">Nenhuma vítima ferida no período.</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr><th>Ocorrência</th><th>Data do fato</th><th>Local</th><th>Vítima</th><th>Idade</th><th>Circunstância</th></tr>
+    </thead>
+    <tbody>
+      {% for v in vitimas %}
+      <tr>
+        <td><a href="{{ url_for('ocorrencia', ocorrencia_id=v.ocorrencia_id) }}">#{{ v.ocorrencia_id }}</a></td>
+        <td>{{ v.data_fato }}</td>
+        <td>{{ v.cidade }} — {{ v.bairro }}</td>
+        <td>{{ v.nome or 'sem nome' }}</td>
+        <td>{{ v.idade if v.idade is not none else '—' }}</td>
+        <td class="suave">{{ v.circunstancia or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

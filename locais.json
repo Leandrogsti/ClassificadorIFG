@@ -1,0 +1,42 @@
+{
+  "_leia_me": "Listas fixas de cidade e bairro. Evitam grafias diferentes para o mesmo lugar, que quebrariam o alerta de duplicidade e as estatísticas. Acrescente aqui os locais conforme a cobertura for ampliada.",
+  "cidades": {
+    "Rio de Janeiro": [
+      "Bangu", "Bonsucesso", "Campo Grande", "Centro", "Complexo do Alemão",
+      "Copacabana", "Cidade de Deus", "Del Castilho", "Engenho de Dentro",
+      "Guadalupe", "Ilha do Governador", "Jacarepaguá", "Madureira", "Maré",
+      "Méier", "Penha", "Rocinha", "Santa Cruz", "São Conrado", "Tijuca"
+    ],
+    "Duque de Caxias": [
+      "Centro", "Campos Elíseos", "Imbariê", "Jardim Primavera", "Parque Lafaiete",
+      "Saracuruna", "Vila São Luís", "Xerém"
+    ],
+    "São Gonçalo": [
+      "Alcântara", "Centro", "Jardim Catarina", "Neves", "Pacheco",
+      "Trindade", "Zé Garoto"
+    ],
+    "Niterói": [
+      "Centro", "Fonseca", "Icaraí", "Ingá", "Piratininga", "Santa Rosa", "São Francisco"
+    ],
+    "Recife": [
+      "Afogados", "Boa Viagem", "Casa Amarela", "Cohab", "Ibura", "Imbiribeira",
+      "Jordão", "Pina", "Santo Amaro", "Torrões", "Várzea"
+    ],
+    "Jaboatão dos Guararapes": [
+      "Cavaleiro", "Centro", "Curado", "Muribeca", "Piedade", "Prazeres", "Socorro"
+    ],
+    "Olinda": [
+      "Bultrins", "Peixinhos", "Rio Doce", "Varadouro", "Ouro Preto"
+    ],
+    "Salvador": [
+      "Barra", "Brotas", "Cabula", "Calabetão", "Itapuã", "Liberdade",
+      "Pau da Lima", "Periperi", "São Caetano", "Subúrbio Ferroviário", "Valéria"
+    ],
+    "Lauro de Freitas": [
+      "Centro", "Itinga", "Portão", "Vila Praiana"
+    ],
+    "Camaçari": [
+      "Centro", "Gleba B", "Phoc I", "Vila de Abrantes"
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<h1>Fila de aprovação</h1>
+<p class="suave">
+  Só registros aprovados vão para a comunicação. Registros com alerta de
+  duplicidade em aberto não podem ser aprovados.
+</p>
+
+{% if not ocorrencias %}
+  <div class="cartao"><p class="suave">Nada aguardando aprovação.</p></div>
+{% endif %}
+
+{% for o in ocorrencias %}
+<div class="cartao">
+  <div class="entre">
+    <div>
+      <h2><a href="{{ url_for('ocorrencia', ocorrencia_id=o.id) }}">Ocorrência #{{ o.id }}</a></h2>
+      <p class="suave">
+        {{ o.data_fato }} · {{ o.cidade }} — {{ o.bairro }} · analista {{ o.analista }}
+      </p>
+    </div>
+    {% if o.alertas %}
+      <span class="status status-nao_aprovado">{{ o.alertas }} alerta(s) de duplicidade</span>
+    {% endif %}
+  </div>
+
+  <p>
+    <strong>{{ o.motivo_principal or 'sem motivação' }}</strong>
+    {% for i in o.indicadores %}<span class="etiqueta">{{ rotulos_indicadores.get(i, i) }}</span>{% endfor %}
+  </p>
+
+  <div class="linha">
+    <form method="post" action="{{ url_for('aprovar', ocorrencia_id=o.id) }}" style="flex:1">
+      <label>Observação (opcional)</label>
+      <div class="linha">
+        <input name="observacao" style="flex:2">
+        <button type="submit">Aprovar</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('reprovar', ocorrencia_id=o.id) }}" style="flex:1">
+      <label>Motivo da devolução</label>
+      <div class="linha">
+        <input name="observacao" style="flex:2" placeholder="O que precisa ser ajustado">
+        <button class="secundario" type="submit">Devolver ao analista</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
