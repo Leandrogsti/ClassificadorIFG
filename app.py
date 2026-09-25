@@ -150,8 +150,53 @@ def inicio():
 
 
 TABELAS_EXPORTADAS = [
-    "ocorrencia", "vitima", "noticia", "vitima_historico", "alerta_duplicidade",
+    "ocorrencia", "noticia", "vitima_historico", "alerta_duplicidade",
 ]
+
+# A planilha de vítimas carrega a localização da ocorrência para que dê para
+# buscar por cidade, bairro e localidade sem precisar cruzar as abas na mão.
+COLUNAS_PLANILHA_VITIMA = [
+    ("id", "ID da vítima"),
+    ("ocorrencia_id", "Ocorrência"),
+    ("data_fato", "Data do fato"),
+    ("cidade", "Cidade"),
+    ("bairro", "Bairro"),
+    ("localidade", "Localidade"),
+    ("nome", "Nome"),
+    ("idade", "Idade"),
+    ("genero", "Gênero"),
+    ("tipo_vitima", "Tipo de vítima"),
+    ("situacao", "Situação"),
+    ("data_morte", "Data da morte"),
+    ("circunstancia", "Circunstância"),
+    ("cargo_politico", "Cargo político"),
+    ("fonte", "Fonte"),
+    ("status_ocorrencia", "Status da ocorrência"),
+]
+
+
+def _aba_de_vitimas(planilha, vitimas: list[dict]) -> None:
+    aba = planilha.create_sheet("vitima")
+    aba.append([rotulo for _, rotulo in COLUNAS_PLANILHA_VITIMA])
+    for vitima in vitimas:
+        aba.append([
+            vocabulario.ROTULOS_CIRCUNSTANCIA.get(vitima["circunstancia"], vitima["circunstancia"])
+            if campo == "circunstancia"
+            else vitima.get(campo)
+            for campo, _ in COLUNAS_PLANILHA_VITIMA
+        ])
+
+
+def _enviar_planilha(planilha, nome: str):
+    buffer = io.BytesIO()
+    planilha.save(buffer)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"{nome}-{date.today().isoformat()}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.route("/exportar")
@@ -164,23 +209,57 @@ def exportar():
     planilha.remove(planilha.active)
 
     for tabela in TABELAS_EXPORTADAS:
-        linhas = con.execute(f"SELECT * FROM {tabela}").fetchall()
         aba = planilha.create_sheet(tabela)
         colunas = [c[1] for c in con.execute(f"PRAGMA table_info({tabela})")]
         aba.append(colunas)
-        for linha in linhas:
+        for linha in con.execute(f"SELECT * FROM {tabela}"):
             aba.append([linha[coluna] for coluna in colunas])
 
-    buffer = io.BytesIO()
-    planilha.save(buffer)
-    buffer.seek(0)
-    nome = f"base-classificador-{date.today().isoformat()}.xlsx"
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=nome,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    _aba_de_vitimas(planilha, servico.filtrar_vitimas(con, {}))
+    return _enviar_planilha(planilha, "base-classificador")
+
+
+def _filtros_de_vitima() -> dict:
+    return {
+        chave: request.args.get(chave, "").strip()
+        for chave in ("de", "ate", "cidade", "bairro", "localidade", "circunstancia", "situacao")
+    }
+
+
+@app.route("/vitimas")
+def vitimas():
+    con = conexao()
+    filtros = _filtros_de_vitima()
+    total = servico.contar_vitimas(con, filtros)
+
+    paginas = max(1, -(-total // POR_PAGINA))
+    try:
+        pagina = min(max(1, int(request.args.get("pagina", 1))), paginas)
+    except ValueError:
+        pagina = 1
+
+    return render_template(
+        "vitimas.html",
+        vitimas=servico.filtrar_vitimas(con, filtros, POR_PAGINA, (pagina - 1) * POR_PAGINA),
+        filtros=filtros,
+        # Sem os vazios, para não sujar as URLs de paginação e download.
+        filtros_ativos={chave: valor for chave, valor in filtros.items() if valor},
+        total=total,
+        pagina=pagina,
+        paginas=paginas,
+        locais=LOCAIS,
     )
+
+
+@app.route("/vitimas/exportar")
+def exportar_vitimas():
+    """Planilha só de vítimas, respeitando a busca ativa na tela."""
+    from openpyxl import Workbook
+
+    planilha = Workbook()
+    planilha.remove(planilha.active)
+    _aba_de_vitimas(planilha, servico.filtrar_vitimas(conexao(), _filtros_de_vitima()))
+    return _enviar_planilha(planilha, "vitimas")
 
 
 @app.route("/analista", methods=["POST"])
@@ -489,10 +568,15 @@ def resolver_alerta(alerta_id: int, acao: str):
 
 @app.route("/acompanhamento")
 def acompanhamento():
+    de = request.args.get("de", "").strip()
+    ate = request.args.get("ate", "").strip()
     return render_template(
         "acompanhamento.html",
-        vitimas=servico.vitimas_em_acompanhamento(conexao()),
+        vitimas=servico.vitimas_em_acompanhamento(conexao(), {"de": de, "ate": ate}),
         dias=servico.DIAS_ACOMPANHAMENTO,
+        de=de,
+        ate=ate,
+        inicio_padrao=servico.inicio_do_acompanhamento(),
     )
 
 

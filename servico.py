@@ -422,15 +422,69 @@ def descartar_alerta(con, alerta_id: int, analista: str, motivo: str) -> None:
     )
 
 
-def vitimas_em_acompanhamento(con) -> list[dict]:
+# A vítima só faz sentido junto do lugar onde o fato aconteceu, então toda
+# listagem e toda planilha de vítimas trazem a localização da ocorrência.
+CONSULTA_VITIMAS = (
+    "SELECT v.*, o.data_fato, o.cidade, o.bairro, o.localidade,"
+    " o.status AS status_ocorrencia FROM vitima v"
+    " JOIN ocorrencia o ON o.id = v.ocorrencia_id"
+)
+
+
+def _clausulas_vitimas(filtros: dict) -> tuple[str, list]:
+    condicoes = ["o.unificada_em IS NULL"]
+    parametros: list = []
+
+    for chave, condicao in (
+        ("de", "o.data_fato >= ?"),
+        ("ate", "o.data_fato <= ?"),
+        ("cidade", "o.cidade = ?"),
+        ("bairro", "o.bairro = ?"),
+        ("circunstancia", "v.circunstancia = ?"),
+        ("situacao", "v.situacao = ?"),
+    ):
+        valor = (filtros.get(chave) or "").strip()
+        if valor:
+            condicoes.append(condicao)
+            parametros.append(valor)
+
+    # Localidade é texto livre digitado pelo analista, então a busca é parcial.
+    localidade = (filtros.get("localidade") or "").strip()
+    if localidade:
+        condicoes.append("o.localidade LIKE ?")
+        parametros.append(f"%{localidade}%")
+
+    return " AND ".join(condicoes), parametros
+
+
+def contar_vitimas(con, filtros: dict) -> int:
+    onde, parametros = _clausulas_vitimas(filtros)
+    return con.execute(
+        "SELECT COUNT(*) AS total FROM vitima v"
+        f" JOIN ocorrencia o ON o.id = v.ocorrencia_id WHERE {onde}",
+        parametros,
+    ).fetchone()["total"]
+
+
+def filtrar_vitimas(con, filtros: dict, limite=None, deslocamento=0) -> list[dict]:
+    onde, parametros = _clausulas_vitimas(filtros)
+    consulta = f"{CONSULTA_VITIMAS} WHERE {onde} ORDER BY o.data_fato DESC, v.id"
+    if limite is not None:
+        consulta += " LIMIT ? OFFSET ?"
+        parametros = [*parametros, limite, deslocamento]
+    return [_linha_para_dict(linha) for linha in con.execute(consulta, parametros)]
+
+
+def inicio_do_acompanhamento() -> str:
+    return (date.today() - timedelta(days=DIAS_ACOMPANHAMENTO)).isoformat()
+
+
+def vitimas_em_acompanhamento(con, filtros: dict | None = None) -> list[dict]:
     """Feridos ficam em checagem periódica por 90 dias, porque a situação pode
-    mudar semanas depois. Passado o prazo, a edição continua possível."""
-    limite = (date.today() - timedelta(days=DIAS_ACOMPANHAMENTO)).isoformat()
-    linhas = con.execute(
-        "SELECT v.*, o.data_fato, o.cidade, o.bairro FROM vitima v"
-        " JOIN ocorrencia o ON o.id = v.ocorrencia_id"
-        " WHERE v.situacao = 'ferida' AND o.data_fato >= ? AND o.unificada_em IS NULL"
-        " ORDER BY o.data_fato DESC",
-        (limite,),
-    ).fetchall()
-    return [_linha_para_dict(linha) for linha in linhas]
+    mudar semanas depois. Passado o prazo, a edição continua possível — por
+    isso a busca por data pode olhar para fora da janela padrão."""
+    filtros = dict(filtros or {})
+    filtros["situacao"] = "ferida"
+    if not filtros.get("de") and not filtros.get("ate"):
+        filtros["de"] = inicio_do_acompanhamento()
+    return filtrar_vitimas(con, filtros)

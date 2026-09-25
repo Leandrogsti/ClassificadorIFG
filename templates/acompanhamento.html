@@ -3,15 +3,36 @@
 {% block conteudo %}
 <h1>Acompanhamento de feridos</h1>
 <p class="suave">
-  Vítimas feridas dos últimos {{ dias }} dias ficam em checagem periódica, porque
-  a situação pode mudar semanas depois. Passado o prazo, a edição continua
-  possível pela tela da ocorrência.
+  Vítimas feridas ficam em checagem periódica por {{ dias }} dias, porque a
+  situação pode mudar semanas depois. Sem filtro de data, a lista mostra os
+  feridos desde {{ inicio_padrao }}; informe um período para olhar fora dessa
+  janela — a edição continua possível pela tela da ocorrência.
 </p>
+
+<div class="cartao">
+  <form method="get" class="linha">
+    <div>
+      <label for="de">Data do fato — de</label>
+      <input type="date" id="de" name="de" value="{{ de }}">
+    </div>
+    <div>
+      <label for="ate">até</label>
+      <input type="date" id="ate" name="ate" value="{{ ate }}">
+    </div>
+    <div style="align-self:end" class="linha">
+      <button type="submit">Buscar</button>
+      {% if de or ate %}
+        <a href="{{ url_for('acompanhamento') }}"><button class="secundario" type="button">Voltar aos {{ dias }} dias</button></a>
+      {% endif %}
+    </div>
+  </form>
+</div>
 
 <div class="cartao">
   {% if not vitimas %}
     <p class="suave">Nenhuma vítima ferida no período.</p>
   {% else %}
+  <p class="suave">{{ vitimas|length }} ferido(s) em acompanhamento.</p>
   <table>
     <thead>
       <tr><th>Ocorrência</th><th>Data do fato</th><th>Local</th><th>Vítima</th><th>Idade</th><th>Circunstância</th></tr>
@@ -21,7 +42,10 @@
       <tr>
         <td><a href="{{ url_for('ocorrencia', ocorrencia_id=v.ocorrencia_id) }}">#{{ v.ocorrencia_id }}</a></td>
         <td>{{ v.data_fato }}</td>
-        <td>{{ v.cidade }} — {{ v.bairro }}</td>
+        <td>
+          {{ v.cidade }} — {{ v.bairro }}
+          {% if v.localidade %}<br><span class="suave">{{ v.localidade }}</span>{% endif %}
+        </td>
         <td>{{ v.nome or 'sem nome' }}</td>
         <td>{{ v.idade if v.idade is not none else '—' }}</td>
         <td class="suave">{{ rotulos_circunstancia.get(v.circunstancia, '—') }}</td>

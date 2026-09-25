@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<div class="entre">
+  <div>
+    <h1>Vítimas</h1>
+    <p class="suave">
+      {{ total }} vítima(s){% if total %} · página {{ pagina }} de {{ paginas }}{% endif %}.
+      Todas as pessoas atingidas, com a circunstância e o local da ocorrência.
+    </p>
+  </div>
+  <a href="{{ url_for('exportar_vitimas', **filtros_ativos) }}">
+    <button class="secundario">Baixar planilha de vítimas (.xlsx)</button>
+  </a>
+</div>
+
+<div class="cartao">
+  <form method="get">
+    <div class="linha">
+      <div>
+        <label for="de">Data do fato — de</label>
+        <input type="date" id="de" name="de" value="{{ filtros.de }}">
+      </div>
+      <div>
+        <label for="ate">até</label>
+        <input type="date" id="ate" name="ate" value="{{ filtros.ate }}">
+      </div>
+      <div>
+        <label for="cidade">Cidade</label>
+        <select id="cidade" name="cidade">
+          <option value="">Todas</option>
+          {% for nome in locais %}
+            <option value="{{ nome }}" {% if filtros.cidade == nome %}selected{% endif %}>{{ nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="bairro">Bairro</label>
+        <select id="bairro" name="bairro">
+          <option value="">Todos</option>
+          {% for nome in locais.get(filtros.cidade, []) %}
+            <option value="{{ nome }}" {% if filtros.bairro == nome %}selected{% endif %}>{{ nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="linha" style="margin-top:12px">
+      <div>
+        <label for="localidade">Localidade</label>
+        <input id="localidade" name="localidade" value="{{ filtros.localidade }}" placeholder="Rua, comunidade...">
+      </div>
+      <div>
+        <label for="circunstancia">Circunstância</label>
+        <select id="circunstancia" name="circunstancia">
+          <option value="">Todas</option>
+          {% for slug, rotulo in circunstancias %}
+            <option value="{{ slug }}" {% if filtros.circunstancia == slug %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="situacao">Situação</label>
+        <select id="situacao" name="situacao">
+          <option value="">Todas</option>
+          {% for opcao in situacoes %}
+            <option value="{{ opcao }}" {% if filtros.situacao == opcao %}selected{% endif %}>{{ opcao }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="align-self:end" class="linha">
+        <button type="submit">Buscar</button>
+        {% if filtros_ativos %}
+          <a href="{{ url_for('vitimas') }}"><button class="secundario" type="button">Limpar</button></a>
+        {% endif %}
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="cartao">
+  {% if not vitimas %}
+    <p class="suave">Nenhuma vítima encontrada com esses filtros.</p>
+  {% else %}
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Ocorrência</th><th>Data do fato</th><th>Local</th><th>Nome</th>
+          <th>Idade</th><th>Gênero</th><th>Tipo</th><th>Situação</th>
+          <th>Data da morte</th><th>Circunstância</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in vitimas %}
+        <tr>
+          <td><a href="{{ url_for('ocorrencia', ocorrencia_id=v.ocorrencia_id) }}">#{{ v.ocorrencia_id }}</a></td>
+          <td>{{ v.data_fato }}</td>
+          <td>
+            {{ v.cidade }} — {{ v.bairro }}
+            {% if v.localidade %}<br><span class="suave">{{ v.localidade }}</span>{% endif %}
+          </td>
+          <td>{{ v.nome or 'sem nome' }}</td>
+          <td>{{ v.idade if v.idade is not none else '—' }}</td>
+          <td>{{ v.genero.replace('_', ' ') }}</td>
+          <td>{{ v.tipo_vitima.replace('_', ' ') }}</td>
+          <td><span class="etiqueta">{{ v.situacao }}</span></td>
+          <td>{{ v.data_morte or '—' }}</td>
+          <td>{{ rotulos_circunstancia.get(v.circunstancia, '—') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% if paginas > 1 %}
+<div class="cartao paginacao">
+  {% if pagina > 1 %}
+    <a href="{{ url_for('vitimas', pagina=pagina-1, **filtros_ativos) }}">← Anterior</a>
+  {% else %}
+    <span class="suave">← Anterior</span>
+  {% endif %}
+  <span class="suave">Página {{ pagina }} de {{ paginas }}</span>
+  {% if pagina < paginas %}
+    <a href="{{ url_for('vitimas', pagina=pagina+1, **filtros_ativos) }}">Próxima →</a>
+  {% else %}
+    <span class="suave">Próxima →</span>
+  {% endif %}
+</div>
+{% endif %}
+
+<script>
+  const bairrosPorCidade = {{ locais|tojson }};
+  const cidade = document.getElementById("cidade");
+  const bairro = document.getElementById("bairro");
+
+  cidade.addEventListener("change", () => {
+    const lista = bairrosPorCidade[cidade.value] || [];
+    bairro.innerHTML = '<option value="">Todos</option>';
+    for (const nome of lista) {
+      const opcao = document.createElement("option");
+      opcao.value = nome;
+      opcao.textContent = nome;
+      bairro.appendChild(opcao);
+    }
+  });
+</script>
+{% endblock %}

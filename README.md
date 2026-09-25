@@ -63,10 +63,22 @@ A **circunstância** é uma lista fechada: Feminicídio/tentativa, Suicídio,
 Acidente, Trajeto escolar, Bala perdida, Chacina, LGBTQIAPN+, Tribunal do crime,
 Vítima de agente de segurança e Não se aplica.
 
-## Tela de ocorrências
+## Telas de consulta
 
-Busca por período (data do fato), filtro por status, paginação de 20 em 20 e um
-botão que baixa **toda a base** como `.xlsx`, com uma aba por tabela.
+**Ocorrências** — busca por período (data do fato), filtro por status, paginação
+de 20 em 20 e um botão que baixa **toda a base** como `.xlsx`, uma aba por tabela.
+
+**Vítimas** — todas as pessoas atingidas, com a circunstância e o local da
+ocorrência. Busca por período, cidade, bairro, localidade (parcial),
+circunstância e situação, e um botão que baixa a **planilha de vítimas**
+respeitando a busca ativa na tela.
+
+**Acompanhamento** — feridos em checagem periódica. Sem filtro, mostra os
+últimos 90 dias; com um período informado, olha fora dessa janela.
+
+A planilha de vítimas traz cidade, bairro e localidade junto de cada pessoa, para
+que dê para buscar pelo local sem cruzar abas na mão. Ela é a mesma aba `vitima`
+do download da base completa.
 
 ## Banco (SQLite)
 
