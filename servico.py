@@ -11,13 +11,12 @@ from db import agora, json_carregar
 
 CAMPOS_VITIMA = [
     "nome", "idade", "genero", "tipo_vitima", "situacao", "data_morte",
-    "cargo_politico", "bala_perdida", "circunstancia", "fonte",
+    "cargo_politico", "circunstancia", "fonte",
 ]
 
-# A LLM só propõe mudanças nos campos estruturados. Em "circunstancia" e
-# "fonte" ela reescreve a frase a cada passagem, e aceitar a proposta apagaria
-# a redação do analista sem trazer informação nova.
-CAMPOS_PROPOSTA = [c for c in CAMPOS_VITIMA if c not in ("circunstancia", "fonte")]
+# "fonte" muda a cada passagem da LLM sem trazer informação nova sobre a
+# pessoa, então não vira proposta para o analista decidir.
+CAMPOS_PROPOSTA = [c for c in CAMPOS_VITIMA if c != "fonte"]
 
 DIAS_ACOMPANHAMENTO = 90
 
@@ -53,10 +52,10 @@ def _casar_manual(vitima: dict, disponiveis: list[dict]) -> dict | None:
     mesma pessoa. Casamento por nome tem prioridade sobre o de perfil, e cada
     vítima só pode ser casada uma vez — é isso que impede a mesma pessoa de
     aparecer duas vezes quando uma notícia nova traz um dado a mais."""
-    nome = (vitima.get("nome") or "").strip().lower()
+    nome = classificador.nome_identificador(vitima)
     if nome:
         for candidato in disponiveis:
-            if (candidato.get("nome") or "").strip().lower() == nome:
+            if classificador.nome_identificador(candidato) == nome:
                 return candidato
     for candidato in disponiveis:
         if classificador.mesma_pessoa(vitima, candidato):
@@ -125,13 +124,13 @@ def reprocessar(con, ocorrencia_id: int) -> dict:
 
         con.execute(
             "INSERT INTO vitima (ocorrencia_id, chave, nome, idade, genero,"
-            " tipo_vitima, situacao, data_morte, circunstancia, bala_perdida,"
+            " tipo_vitima, situacao, data_morte, circunstancia,"
             " cargo_politico, fonte, divergencia, criado_em, atualizado_em)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 ocorrencia_id, vitima["chave"], vitima["nome"], vitima["idade"],
                 vitima["genero"], vitima["tipo_vitima"], vitima["situacao"],
-                vitima["data_morte"], vitima["circunstancia"], vitima["bala_perdida"],
+                vitima["data_morte"], vitima["circunstancia"],
                 vitima["cargo_politico"], vitima["fonte"], vitima["divergencia"],
                 momento, momento,
             ),
@@ -189,8 +188,6 @@ def _normalizar_valor(campo: str, valor):
     if campo == "idade":
         texto = str(valor).strip()
         return int(texto) if texto.isdigit() else None
-    if campo == "bala_perdida":
-        return 1 if valor in (1, "1", True, "on", "true") else 0
     texto = str(valor).strip()
     return texto or None
 
@@ -268,18 +265,18 @@ def criar_vitima_manual(con, ocorrencia_id: int, dados: dict, analista: str) -> 
     valores["genero"] = valores["genero"] or "nao_informado"
     valores["tipo_vitima"] = valores["tipo_vitima"] or "nao_informado"
     valores["situacao"] = valores["situacao"] or "ferida"
-    valores["bala_perdida"] = valores["bala_perdida"] or 0
+    valores["circunstancia"] = valores["circunstancia"] or "nao_se_aplica"
 
     cursor = con.execute(
         "INSERT INTO vitima (ocorrencia_id, chave, nome, idade, genero, tipo_vitima,"
-        " situacao, data_morte, cargo_politico, bala_perdida, circunstancia, fonte,"
+        " situacao, data_morte, cargo_politico, circunstancia, fonte,"
         " editado_manualmente, criado_em, atualizado_em)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
         (
             ocorrencia_id, classificador.chave_vitima(valores), valores["nome"],
             valores["idade"], valores["genero"], valores["tipo_vitima"],
             valores["situacao"], valores["data_morte"], valores["cargo_politico"],
-            valores["bala_perdida"], valores["circunstancia"], valores["fonte"],
+            valores["circunstancia"], valores["fonte"],
             momento, momento,
         ),
     )

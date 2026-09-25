@@ -13,7 +13,7 @@
     <div>
       <label>Gênero</label>
       <select name="genero">
-        {% for opcao in ['feminino', 'masculino', 'nao_informado'] %}
+        {% for opcao in generos %}
           <option value="{{ opcao }}" {% if v.genero == opcao %}selected{% endif %}>{{ opcao.replace('_', ' ') }}</option>
         {% endfor %}
       </select>
@@ -21,7 +21,7 @@
     <div>
       <label>Tipo de vítima</label>
       <select name="tipo_vitima">
-        {% for opcao in ['civil', 'agente_seguranca', 'politico', 'suspeito', 'nao_informado'] %}
+        {% for opcao in tipos_vitima %}
           <option value="{{ opcao }}" {% if v.tipo_vitima == opcao %}selected{% endif %}>{{ opcao.replace('_', ' ') }}</option>
         {% endfor %}
       </select>
@@ -31,7 +31,7 @@
     <div>
       <label>Situação</label>
       <select name="situacao">
-        {% for opcao in ['ferida', 'morta', 'ilesa'] %}
+        {% for opcao in situacoes %}
           <option value="{{ opcao }}" {% if v.situacao == opcao %}selected{% endif %}>{{ opcao }}</option>
         {% endfor %}
       </select>
@@ -44,18 +44,15 @@
       <label>Cargo / candidatura política</label>
       <input name="cargo_politico" value="{{ v.cargo_politico or '' }}">
     </div>
-    <div>
-      <label>Bala perdida</label>
-      <select name="bala_perdida">
-        <option value="0" {% if not v.bala_perdida %}selected{% endif %}>não</option>
-        <option value="1" {% if v.bala_perdida %}selected{% endif %}>sim</option>
-      </select>
-    </div>
   </div>
   <div class="linha" style="margin-top:10px">
     <div style="flex:2">
       <label>Circunstância</label>
-      <input name="circunstancia" value="{{ v.circunstancia or '' }}">
+      <select name="circunstancia">
+        {% for slug, rotulo in circunstancias %}
+          <option value="{{ slug }}" {% if v.circunstancia == slug %}selected{% endif %}>{{ rotulo }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div>
       <label>Fonte</label>
@@ -196,7 +193,9 @@
           <strong>A LLM propõe mudanças a partir das notícias:</strong>
           <ul>
             {% for campo, valor in v.proposta.items() %}
-              <li>{{ campo }}: <strong>{{ valor if valor is not none else 'vazio' }}</strong> (atual: {{ v[campo] if v[campo] is not none else 'vazio' }})</li>
+              {% set novo = rotulos_circunstancia.get(valor, valor) if campo == 'circunstancia' else valor %}
+              {% set atual = rotulos_circunstancia.get(v[campo], v[campo]) if campo == 'circunstancia' else v[campo] %}
+              <li>{{ campo }}: <strong>{{ novo if novo is not none else 'vazio' }}</strong> (atual: {{ atual if atual is not none else 'vazio' }})</li>
             {% endfor %}
           </ul>
           <form method="post" action="{{ url_for('resolver_proposta', vitima_id=v.id, acao='aceitar') }}" style="display:inline">

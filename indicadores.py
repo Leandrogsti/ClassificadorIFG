@@ -9,9 +9,6 @@ from pathlib import Path
 
 FONTE = Path(__file__).parent / "indicadores_fonte.json"
 
-# Só entram nas regras as pessoas efetivamente atingidas por disparo.
-SITUACOES_BALEADAS = {"morta", "ferida"}
-
 
 def carregar() -> list[dict]:
     return json.loads(FONTE.read_text(encoding="utf-8"))["indicadores"]
@@ -30,7 +27,9 @@ def rotulos() -> dict[str, str]:
 
 
 def _avaliar_regra(regra: dict, vitimas: list[dict]) -> bool:
-    baleadas = [v for v in vitimas if (v.get("situacao") or "") in SITUACOES_BALEADAS]
+    # Toda vítima registrada foi atingida por disparo, então as regras valem
+    # para a lista inteira.
+    baleadas = vitimas
     campo = regra.get("campo")
     valor = regra.get("valor")
     operacao = regra.get("operacao")

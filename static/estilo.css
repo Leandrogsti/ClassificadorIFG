@@ -134,3 +134,5 @@ details[open] > summary { margin-bottom: 10px; }
 
 .passos { list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--suave); }
 .passos li { padding: 3px 0; }
+
+.paginacao { display: flex; justify-content: space-between; align-items: center; }

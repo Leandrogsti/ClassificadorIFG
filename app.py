@@ -4,18 +4,21 @@ Fluxo: abre a ocorrência com data e endereço, cola as notícias, o sistema
 classifica e consolida as vítimas, o analista confere, conclui e o registro
 entra na fila de aprovação.
 """
+import io
 import json
 import os
+from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import (
-    Flask, flash, g, redirect, render_template, request, session, url_for
+    Flask, flash, g, redirect, render_template, request, send_file, session, url_for
 )
 
 import db
 import indicadores
 import servico
+import vocabulario
 from classificador import ErroClassificacao
 
 load_dotenv()
@@ -54,6 +57,11 @@ def variaveis_globais():
         "rotulos_indicadores": indicadores.rotulos(),
         "rotulos_status": ROTULOS_STATUS,
         "analista": session.get("analista", ""),
+        "circunstancias": vocabulario.CIRCUNSTANCIAS,
+        "rotulos_circunstancia": vocabulario.ROTULOS_CIRCUNSTANCIA,
+        "situacoes": vocabulario.SITUACOES,
+        "generos": vocabulario.GENEROS,
+        "tipos_vitima": vocabulario.TIPOS_VITIMA,
     }
 
 
@@ -77,23 +85,49 @@ def buscar_ocorrencia(ocorrencia_id: int):
     return ocorrencia
 
 
+POR_PAGINA = 20
+
+
 @app.route("/")
 def inicio():
     con = conexao()
     status = request.args.get("status", "")
-    consulta = (
-        "SELECT o.*, (SELECT COUNT(*) FROM vitima v WHERE v.ocorrencia_id = o.id)"
-        " AS total_vitimas, (SELECT COUNT(*) FROM noticia n WHERE n.ocorrencia_id = o.id)"
-        " AS total_noticias FROM ocorrencia o WHERE o.unificada_em IS NULL"
-    )
+    de = request.args.get("de", "")
+    ate = request.args.get("ate", "")
+
+    filtros = ["o.unificada_em IS NULL"]
     parametros = []
     if status:
-        consulta += " AND o.status = ?"
+        filtros.append("o.status = ?")
         parametros.append(status)
-    consulta += " ORDER BY o.data_fato DESC, o.id DESC"
+    if de:
+        filtros.append("o.data_fato >= ?")
+        parametros.append(de)
+    if ate:
+        filtros.append("o.data_fato <= ?")
+        parametros.append(ate)
+    onde = " AND ".join(filtros)
+
+    total = con.execute(
+        f"SELECT COUNT(*) AS total FROM ocorrencia o WHERE {onde}", parametros
+    ).fetchone()["total"]
+
+    paginas = max(1, -(-total // POR_PAGINA))
+    try:
+        pagina = min(max(1, int(request.args.get("pagina", 1))), paginas)
+    except ValueError:
+        pagina = 1
+
+    linhas = con.execute(
+        "SELECT o.*, (SELECT COUNT(*) FROM vitima v WHERE v.ocorrencia_id = o.id)"
+        " AS total_vitimas, (SELECT COUNT(*) FROM noticia n WHERE n.ocorrencia_id = o.id)"
+        f" AS total_noticias FROM ocorrencia o WHERE {onde}"
+        " ORDER BY o.data_fato DESC, o.id DESC LIMIT ? OFFSET ?",
+        [*parametros, POR_PAGINA, (pagina - 1) * POR_PAGINA],
+    ).fetchall()
 
     ocorrencias = []
-    for linha in con.execute(consulta, parametros).fetchall():
+    for linha in linhas:
         registro = {k: linha[k] for k in linha.keys()}
         registro["indicadores"] = db.json_carregar(linha["indicadores"], [])
         ocorrencias.append(registro)
@@ -106,7 +140,46 @@ def inicio():
         "inicio.html",
         ocorrencias=ocorrencias,
         status_filtro=status,
+        de=de,
+        ate=ate,
         alertas_abertos=alertas_abertos,
+        total=total,
+        pagina=pagina,
+        paginas=paginas,
+    )
+
+
+TABELAS_EXPORTADAS = [
+    "ocorrencia", "vitima", "noticia", "vitima_historico", "alerta_duplicidade",
+]
+
+
+@app.route("/exportar")
+def exportar():
+    """Baixa a base inteira como uma planilha, uma aba por tabela."""
+    from openpyxl import Workbook
+
+    con = conexao()
+    planilha = Workbook()
+    planilha.remove(planilha.active)
+
+    for tabela in TABELAS_EXPORTADAS:
+        linhas = con.execute(f"SELECT * FROM {tabela}").fetchall()
+        aba = planilha.create_sheet(tabela)
+        colunas = [c[1] for c in con.execute(f"PRAGMA table_info({tabela})")]
+        aba.append(colunas)
+        for linha in linhas:
+            aba.append([linha[coluna] for coluna in colunas])
+
+    buffer = io.BytesIO()
+    planilha.save(buffer)
+    buffer.seek(0)
+    nome = f"base-classificador-{date.today().isoformat()}.xlsx"
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=nome,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 
@@ -245,7 +318,6 @@ def excluir_noticia(noticia_id: int):
 def editar_vitima(vitima_id: int):
     con = conexao()
     dados = {campo: request.form.get(campo) for campo in servico.CAMPOS_VITIMA}
-    dados["bala_perdida"] = request.form.get("bala_perdida", "0")
     with con:
         ocorrencia_id = servico.atualizar_vitima(
             con, vitima_id, dados, analista_atual(), request.form.get("fonte_alteracao", "")

@@ -10,6 +10,8 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from vocabulario import CIRCUNSTANCIA_PADRAO, ROTULOS_CIRCUNSTANCIA
+
 CAMINHO_BANCO = Path(__file__).parent / "classificador.db"
 
 ESQUEMA = """
@@ -65,7 +67,6 @@ CREATE TABLE IF NOT EXISTS vitima (
     situacao            TEXT,
     data_morte          TEXT,
     circunstancia       TEXT,
-    bala_perdida        INTEGER NOT NULL DEFAULT 0,
     cargo_politico      TEXT,
     fonte               TEXT,
     divergencia         TEXT,
@@ -122,6 +123,31 @@ def conectar() -> sqlite3.Connection:
 def iniciar() -> None:
     with conectar() as con:
         con.executescript(ESQUEMA)
+        _migrar(con)
+
+
+def _migrar(con) -> None:
+    """Ajusta bancos criados antes de uma mudança de esquema."""
+    colunas = {linha[1] for linha in con.execute("PRAGMA table_info(vitima)")}
+
+    # "bala perdida" virou um dos valores de `circunstancia`; manter a coluna
+    # booleana permitiria que os dois campos se contradissessem.
+    if "bala_perdida" in colunas:
+        con.execute(
+            "UPDATE vitima SET circunstancia = 'bala_perdida' WHERE bala_perdida = 1"
+        )
+        con.execute("ALTER TABLE vitima DROP COLUMN bala_perdida")
+
+    # `circunstancia` era texto livre e passou a ser lista fechada.
+    marcadores = ",".join("?" for _ in ROTULOS_CIRCUNSTANCIA)
+    con.execute(
+        "UPDATE vitima SET circunstancia = ?"
+        f" WHERE circunstancia IS NULL OR circunstancia NOT IN ({marcadores})",
+        (CIRCUNSTANCIA_PADRAO, *ROTULOS_CIRCUNSTANCIA),
+    )
+
+    # Vítima ilesa deixou de existir: só entra na lista quem foi atingido.
+    con.execute("DELETE FROM vitima WHERE situacao = 'ilesa'")
 
 
 def json_carregar(valor, padrao):

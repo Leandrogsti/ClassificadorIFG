@@ -47,9 +47,26 @@ identifica a pessoa; sem nome, o sistema compara idade, gênero e tipo de vítim
 e um valor "não informado" nunca contradiz um informado. "Um homem baleado" em
 um jornal e "dois homens baleados" em outro resultam em 2 vítimas, não 3.
 
+Descrições no lugar do nome ("Adolescente de 16 anos") não contam como nome: a
+comparação cai para o perfil. Sem isso, a mesma pessoa vira duas assim que outra
+notícia a descreve de outro jeito — e, contadas as duas como mortas, apareceria
+uma chacina que não houve.
+
+Só entra na lista quem foi **atingido** por disparo: a situação é `ferida` ou
+`morta`, e não existe vítima ilesa.
+
 Quando a LLM discorda de uma vítima já corrigida pelo analista — um ferido que
 morreu, por exemplo —, a divergência vira uma **proposta** para ele aceitar, em
 vez de sobrescrever a correção.
+
+A **circunstância** é uma lista fechada: Feminicídio/tentativa, Suicídio,
+Acidente, Trajeto escolar, Bala perdida, Chacina, LGBTQIAPN+, Tribunal do crime,
+Vítima de agente de segurança e Não se aplica.
+
+## Tela de ocorrências
+
+Busca por período (data do fato), filtro por status, paginação de 20 em 20 e um
+botão que baixa **toda a base** como `.xlsx`, com uma aba por tabela.
 
 ## Banco (SQLite)
 

@@ -85,7 +85,7 @@
         <div>
           <label for="campo">Campo da vítima</label>
           <select id="campo" name="campo">
-            {% for c in ['idade', 'genero', 'tipo_vitima', 'situacao', 'cargo_politico', 'bala_perdida'] %}
+            {% for c in ['idade', 'genero', 'tipo_vitima', 'situacao', 'cargo_politico', 'circunstancia'] %}
               <option value="{{ c }}">{{ c }}</option>
             {% endfor %}
           </select>

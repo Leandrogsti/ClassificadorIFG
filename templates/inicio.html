@@ -5,20 +5,31 @@
   <div>
     <h1>Ocorrências</h1>
     <p class="suave">
-      {{ ocorrencias|length }} registro(s).
+      {{ total }} registro(s){% if total %} · página {{ pagina }} de {{ paginas }}{% endif %}.
       {% if alertas_abertos %}
         <a href="{{ url_for('alertas') }}">{{ alertas_abertos }} alerta(s) de duplicidade em aberto</a>.
       {% endif %}
     </p>
   </div>
-  <a href="{{ url_for('nova_ocorrencia') }}"><button>Nova ocorrência</button></a>
+  <div class="linha">
+    <a href="{{ url_for('exportar') }}"><button class="secundario">Baixar base (.xlsx)</button></a>
+    <a href="{{ url_for('nova_ocorrencia') }}"><button>Nova ocorrência</button></a>
+  </div>
 </div>
 
 <div class="cartao">
   <form method="get" class="linha">
     <div>
-      <label for="status">Filtrar por status</label>
-      <select id="status" name="status" onchange="this.form.submit()">
+      <label for="de">Data do fato — de</label>
+      <input type="date" id="de" name="de" value="{{ de }}">
+    </div>
+    <div>
+      <label for="ate">até</label>
+      <input type="date" id="ate" name="ate" value="{{ ate }}">
+    </div>
+    <div>
+      <label for="status">Status</label>
+      <select id="status" name="status">
         <option value="">Todos</option>
         {% for chave, rotulo in rotulos_status.items() %}
           {% if chave != 'unificada' %}
@@ -26,6 +37,12 @@
           {% endif %}
         {% endfor %}
       </select>
+    </div>
+    <div style="align-self:end" class="linha">
+      <button type="submit">Buscar</button>
+      {% if de or ate or status_filtro %}
+        <a href="{{ url_for('inicio') }}"><button class="secundario" type="button">Limpar</button></a>
+      {% endif %}
     </div>
   </form>
 </div>
@@ -60,4 +77,22 @@
   </table>
   {% endif %}
 </div>
+
+{% if paginas > 1 %}
+<div class="cartao paginacao">
+  {% if pagina > 1 %}
+    <a href="{{ url_for('inicio', pagina=pagina-1, de=de, ate=ate, status=status_filtro) }}">← Anterior</a>
+  {% else %}
+    <span class="suave">← Anterior</span>
+  {% endif %}
+
+  <span class="suave">Página {{ pagina }} de {{ paginas }}</span>
+
+  {% if pagina < paginas %}
+    <a href="{{ url_for('inicio', pagina=pagina+1, de=de, ate=ate, status=status_filtro) }}">Próxima →</a>
+  {% else %}
+    <span class="suave">Próxima →</span>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

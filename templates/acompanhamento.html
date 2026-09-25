@@ -24,7 +24,7 @@
         <td>{{ v.cidade }} — {{ v.bairro }}</td>
         <td>{{ v.nome or 'sem nome' }}</td>
         <td>{{ v.idade if v.idade is not none else '—' }}</td>
-        <td class="suave">{{ v.circunstancia or '—' }}</td>
+        <td class="suave">{{ rotulos_circunstancia.get(v.circunstancia, '—') }}</td>
       </tr>
       {% endfor %}
     </tbody>
