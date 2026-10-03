@@ -15,9 +15,12 @@ from flask import (
     Flask, flash, g, redirect, render_template, request, send_file, session, url_for
 )
 
+import corpus
 import db
 import indicadores
+import inferencia
 import servico
+import treinamento
 import vocabulario
 from classificador import ErroClassificacao
 
@@ -635,6 +638,329 @@ def excluir_indicador(nome: str):
 @app.route("/bairros/<cidade>")
 def bairros(cidade: str):
     return {"bairros": LOCAIS.get(cidade, [])}
+
+
+# --------------------------------------------------------------------------
+# Corpus de treino, treino dos modelos e testes antes da camada de LLM
+# --------------------------------------------------------------------------
+
+def _filtros_de_corpus() -> dict:
+    return {
+        chave: request.args.get(chave, "").strip()
+        for chave in ("violencia_armada", "motivo_principal", "busca", "particao")
+    }
+
+
+@app.route("/corpus")
+def corpus_repositorio():
+    con = conexao()
+    filtros = _filtros_de_corpus()
+    total = corpus.contar(con, filtros)
+
+    paginas = max(1, -(-total // POR_PAGINA))
+    try:
+        pagina = min(max(1, int(request.args.get("pagina", 1))), paginas)
+    except ValueError:
+        pagina = 1
+
+    return render_template(
+        "corpus.html",
+        noticias=corpus.listar(con, filtros, POR_PAGINA, (pagina - 1) * POR_PAGINA),
+        filtros=filtros,
+        filtros_ativos={c: v for c, v in filtros.items() if v},
+        estatisticas=corpus.estatisticas(con),
+        motivacoes=vocabulario.motivacoes(),
+        indicadores_texto=[i for i in indicadores.carregar() if i["tipo"] == "texto"],
+        total=total,
+        pagina=pagina,
+        paginas=paginas,
+    )
+
+
+@app.route("/corpus/nova", methods=["POST"])
+def corpus_adicionar():
+    texto = request.form.get("texto", "").strip()
+    if not texto:
+        flash("O texto da notícia é obrigatório.", "erro")
+        return redirect(url_for("corpus_repositorio"))
+
+    con = conexao()
+    dados = {
+        "link": request.form.get("link"),
+        "titulo": request.form.get("titulo"),
+        "texto": texto,
+        "violencia_armada": request.form.get("violencia_armada"),
+        "motivo_principal": request.form.get("motivo_principal"),
+        "indicadores": request.form.getlist("indicadores"),
+        "observacao": request.form.get("observacao"),
+    }
+    with con:
+        novo = corpus.adicionar(con, dados, analista_atual())
+    flash(f"Notícia #{novo} incluída no corpus.", "ok")
+
+    if request.form.get("continuar"):
+        return redirect(url_for("corpus_repositorio", _anchor="nova"))
+    return redirect(url_for("corpus_noticia", noticia_id=novo))
+
+
+@app.route("/corpus/<int:noticia_id>", methods=["GET", "POST"])
+def corpus_noticia(noticia_id: int):
+    con = conexao()
+
+    if request.method == "POST":
+        dados = {
+            "link": request.form.get("link"),
+            "titulo": request.form.get("titulo"),
+            "texto": request.form.get("texto", "").strip(),
+            "violencia_armada": request.form.get("violencia_armada"),
+            "motivo_principal": request.form.get("motivo_principal"),
+            "indicadores": request.form.getlist("indicadores"),
+            "observacao": request.form.get("observacao"),
+        }
+        if not dados["texto"]:
+            flash("O texto da notícia é obrigatório.", "erro")
+            return redirect(url_for("corpus_noticia", noticia_id=noticia_id))
+        with con:
+            corpus.atualizar(con, noticia_id, dados, analista_atual())
+        flash("Rótulos salvos.", "ok")
+        proxima = request.form.get("proxima")
+        if proxima:
+            return redirect(url_for("corpus_anotar"))
+        return redirect(url_for("corpus_noticia", noticia_id=noticia_id))
+
+    registro = corpus.buscar(con, noticia_id)
+    if registro is None:
+        flash("Notícia não encontrada no corpus.", "erro")
+        return redirect(url_for("corpus_repositorio"))
+
+    return render_template(
+        "corpus_noticia.html",
+        noticia=registro,
+        motivacoes=vocabulario.motivacoes(),
+        indicadores_texto=[i for i in indicadores.carregar() if i["tipo"] == "texto"],
+        restantes=corpus.contar(con, {"violencia_armada": "nao_rotulado"}),
+    )
+
+
+@app.route("/corpus/anotar")
+def corpus_anotar():
+    """Fila de anotação: entrega a próxima notícia sem rótulo."""
+    con = conexao()
+    pendentes = corpus.listar(con, {"violencia_armada": "nao_rotulado"}, 1)
+    if not pendentes:
+        flash("Nenhuma notícia sem rótulo. O corpus está todo anotado.", "ok")
+        return redirect(url_for("corpus_repositorio"))
+    return redirect(url_for("corpus_noticia", noticia_id=pendentes[0]["id"]))
+
+
+@app.route("/corpus/<int:noticia_id>/excluir", methods=["POST"])
+def corpus_excluir(noticia_id: int):
+    con = conexao()
+    with con:
+        corpus.remover(con, noticia_id)
+    flash(f"Notícia #{noticia_id} removida do corpus.", "ok")
+    return redirect(url_for("corpus_repositorio"))
+
+
+@app.route("/corpus/dividir", methods=["POST"])
+def corpus_dividir():
+    con = conexao()
+    try:
+        semente = int(request.form.get("semente", 42))
+    except ValueError:
+        semente = 42
+    with con:
+        contagem = corpus.dividir(con, semente=semente)
+    flash(
+        f"Divisão estratificada com semente {semente}: {contagem['treino']} treino,"
+        f" {contagem['validacao']} validação, {contagem['teste']} teste.",
+        "ok",
+    )
+    return redirect(url_for("corpus_repositorio"))
+
+
+COLUNAS_CORPUS = [
+    ("id", "ID"), ("link", "Link"), ("titulo", "Título"), ("texto", "Texto"),
+    ("violencia_armada", "Violência armada"), ("motivo_principal", "Motivação"),
+    ("indicadores", "Indicadores"), ("particao", "Partição"),
+    ("observacao", "Observação"), ("anotador", "Anotador"), ("criado_em", "Criado em"),
+]
+
+
+@app.route("/corpus/exportar")
+def corpus_exportar():
+    """O corpus precisa sair do banco para ser anexado ao TCC e reproduzido."""
+    from openpyxl import Workbook
+
+    planilha = Workbook()
+    planilha.remove(planilha.active)
+    aba = planilha.create_sheet("corpus")
+    aba.append([rotulo for _, rotulo in COLUNAS_CORPUS])
+    for registro in corpus.listar(conexao(), _filtros_de_corpus()):
+        aba.append([
+            ", ".join(registro["indicadores"]) if campo == "indicadores"
+            else registro.get(campo)
+            for campo, _ in COLUNAS_CORPUS
+        ])
+    return _enviar_planilha(planilha, "corpus-treino")
+
+
+@app.route("/corpus/importar", methods=["POST"])
+def corpus_importar():
+    """Importa um lote de notícias de planilha, para quando o corpus já existe
+    fora da aplicação. Colunas aceitas: link, titulo, texto, violencia_armada,
+    motivo_principal, indicadores."""
+    from openpyxl import load_workbook
+
+    arquivo = request.files.get("arquivo")
+    if not arquivo or not arquivo.filename:
+        flash("Selecione uma planilha .xlsx para importar.", "erro")
+        return redirect(url_for("corpus_repositorio"))
+
+    try:
+        planilha = load_workbook(arquivo, read_only=True, data_only=True)
+    except Exception as erro:
+        flash(f"Não foi possível ler a planilha: {erro}", "erro")
+        return redirect(url_for("corpus_repositorio"))
+
+    aba = planilha[planilha.sheetnames[0]]
+    linhas = aba.iter_rows(values_only=True)
+    cabecalho = [str(c or "").strip().lower() for c in next(linhas, [])]
+    if "texto" not in cabecalho:
+        flash("A planilha precisa ter uma coluna chamada 'texto'.", "erro")
+        return redirect(url_for("corpus_repositorio"))
+
+    con = conexao()
+    importadas = ignoradas = 0
+    with con:
+        for linha in linhas:
+            registro = dict(zip(cabecalho, linha))
+            texto = str(registro.get("texto") or "").strip()
+            if not texto:
+                ignoradas += 1
+                continue
+            bruto = registro.get("indicadores") or ""
+            corpus.adicionar(con, {
+                "link": registro.get("link"),
+                "titulo": registro.get("titulo"),
+                "texto": texto,
+                "violencia_armada": registro.get("violencia_armada"),
+                "motivo_principal": registro.get("motivo_principal"),
+                "indicadores": [p.strip() for p in str(bruto).split(",") if p.strip()],
+                "observacao": registro.get("observacao"),
+            }, analista_atual())
+            importadas += 1
+
+    flash(
+        f"{importadas} notícia(s) importada(s)."
+        + (f" {ignoradas} linha(s) sem texto ignorada(s)." if ignoradas else ""),
+        "ok",
+    )
+    return redirect(url_for("corpus_repositorio"))
+
+
+@app.route("/modelos")
+def modelos():
+    """Resultados do treino: a tabela comparativa e as matrizes de confusão."""
+    con = conexao()
+    execucoes = {}
+    for tarefa in corpus.TAREFAS:
+        linhas = con.execute(
+            "SELECT * FROM treino_execucao WHERE tarefa = ? ORDER BY id DESC",
+            (tarefa,),
+        ).fetchall()
+        registros = []
+        for linha in linhas:
+            registro = {k: linha[k] for k in linha.keys()}
+            registro["hiperparametros"] = db.json_carregar(linha["hiperparametros"], {})
+            registro["metricas"] = db.json_carregar(linha["metricas"], {})
+            registro["rotulos"] = db.json_carregar(linha["rotulos"], [])
+            registro["historico"] = db.json_carregar(linha["historico"], [])
+            registros.append(registro)
+        execucoes[tarefa] = registros
+
+    return render_template(
+        "modelos.html",
+        execucoes=execucoes,
+        tarefas=corpus.TAREFAS,
+        catalogo=treinamento.MODELOS,
+        grade=treinamento.GRADE,
+        ambiente=treinamento.descrever_ambiente(),
+        estatisticas=corpus.estatisticas(con),
+        treinados={t: inferencia.treinado(t) for t in corpus.TAREFAS},
+    )
+
+
+@app.route("/modelos/<int:execucao_id>")
+def modelo_execucao(execucao_id: int):
+    linha = conexao().execute(
+        "SELECT * FROM treino_execucao WHERE id = ?", (execucao_id,)
+    ).fetchone()
+    if linha is None:
+        flash("Execução não encontrada.", "erro")
+        return redirect(url_for("modelos"))
+
+    execucao = {k: linha[k] for k in linha.keys()}
+    execucao["hiperparametros"] = db.json_carregar(linha["hiperparametros"], {})
+    execucao["metricas"] = db.json_carregar(linha["metricas"], {})
+    execucao["rotulos"] = db.json_carregar(linha["rotulos"], [])
+    execucao["historico"] = db.json_carregar(linha["historico"], [])
+    return render_template(
+        "modelo_execucao.html", execucao=execucao, catalogo=treinamento.MODELOS
+    )
+
+
+@app.route("/testar", methods=["GET", "POST"])
+def testar():
+    """Playground: o que o BERT responde, antes de qualquer LLM."""
+    etapa = request.args.get("etapa", "violencia")
+    texto = request.form.get("texto", "") if request.method == "POST" else ""
+    resultado = erro = None
+
+    if request.method == "POST" and texto.strip():
+        try:
+            if etapa == "pipeline":
+                resultado = inferencia.pipeline(texto)
+            else:
+                resultado = inferencia.prever(etapa, texto)
+        except RuntimeError as falha:
+            erro = str(falha)
+
+    # O pipeline só precisa da etapa 1 para dar uma resposta útil: se a notícia
+    # não é violência armada, as outras nem rodam.
+    necessarias = ["violencia"] if etapa == "pipeline" else [etapa]
+
+    return render_template(
+        "testar.html",
+        etapa=etapa,
+        texto=texto,
+        resultado=resultado,
+        erro=erro,
+        tarefas=corpus.TAREFAS,
+        treinados={t: inferencia.treinado(t) for t in corpus.TAREFAS},
+        faltando=[t for t in necessarias if not inferencia.treinado(t)],
+        motivacoes={c["nome"]: c for c in vocabulario.motivacoes()},
+    )
+
+
+@app.route("/testar/salvar", methods=["POST"])
+def testar_salvar():
+    """Leva um texto do playground para o corpus. É assim que um erro visto no
+    teste vira exemplo de treino em vez de só uma anotação perdida."""
+    texto = request.form.get("texto", "").strip()
+    if not texto:
+        flash("Nada para salvar.", "erro")
+        return redirect(url_for("testar"))
+
+    con = conexao()
+    with con:
+        novo = corpus.adicionar(con, {
+            "link": request.form.get("link"),
+            "texto": texto,
+            "observacao": "Enviada do playground de testes",
+        }, analista_atual())
+    flash(f"Notícia #{novo} enviada ao corpus. Agora defina os rótulos.", "ok")
+    return redirect(url_for("corpus_noticia", noticia_id=novo))
 
 
 if __name__ == "__main__":

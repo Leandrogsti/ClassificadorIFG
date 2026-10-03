@@ -113,14 +113,59 @@ alteração — um ferido que morre pode transformar a ocorrência em chacina. O
 A tela **Gestão** cadastra indicadores e edita as skills sem mexer no código,
 gravando em `indicadores_fonte.json`.
 
-## BERTimbau
+## Classificadores antes da LLM
 
-O filtro só entra em ação com um checkpoint **ajustado** para os indicadores,
-apontado por `BERTIMBAU_MODELO` no `.env`. O BERTimbau puro não tem cabeça de
-classificação treinada e devolveria rótulos aleatórios, o que é pior que não
-filtrar — por isso, enquanto não houver checkpoint, a classificação fica a cargo
-da LLM. Indicadores de texto novos exigem exemplos rotulados (cadastrados na
-tela de Gestão) para o retreino.
+Duas etapas encadeadas, treinadas sobre um corpus rotulado à mão:
+
+1. **Violência armada** (binária) — a premissa é única: a notícia relata
+   **disparo de arma de fogo**? Ameaça com arma sem tiro, apreensão de arma ou
+   agressão sem disparo são negativos. Só o que passa segue adiante.
+2. **Motivação** (15 classes) e **indicadores de texto** (multirrótulo) — sobre
+   as mesmas categorias que alimentam o prompt da LLM.
+
+### Corpus (`/corpus`)
+
+Repositório de notícias rotuladas, com link e texto guardados para que a origem
+de cada rótulo seja auditável. Mostra a distribuição por classe e diz, por
+tarefa, se já há exemplos suficientes para uma medição honesta. Importa e exporta
+planilha `.xlsx`.
+
+A divisão treino/validação/teste é sorteada de forma estratificada e **gravada no
+banco**: refazer o sorteio a cada treino mudaria o conjunto de teste e tornaria
+os modelos incomparáveis.
+
+### Treino (`rodar_treino.py`)
+
+```bash
+python rodar_treino.py --dividir --tarefa violencia   # compara os 6 modelos
+python rodar_treino.py --tarefa todas                 # as três tarefas
+python rodar_treino.py --tarefa violencia --dispositivo cpu
+```
+
+Seis modelos comparados — BERTimbau base e large, Albertina PT-BR, XLM-RoBERTa,
+mBERT e DistilBERT multilingual — cada um com quatro configurações de
+hiperparâmetros. Os hiperparâmetros são escolhidos pelo **F1 macro na validação**,
+nunca no teste: olhar o teste para escolher a configuração vaza informação e
+infla o resultado.
+
+Cada execução grava acurácia, precisão, recall e F1 (macro, ponderado e por
+classe) mais a matriz de confusão. Falhas também são registradas — um modelo que
+não cabe na placa de vídeo é resultado, não motivo para omitir a linha.
+
+### Resultados (`/modelos`) e testes (`/testar`)
+
+`/modelos` traz a tabela comparativa, as matrizes de confusão e o aprendizado por
+época. `/testar` é o playground: cole uma notícia e veja o que o modelo responde,
+com a confiança de cada classe, **antes de qualquer LLM** — é assim que se julga
+se a LLM está corrigindo o classificador ou apenas repetindo-o. Um texto que o
+modelo errou pode ser enviado ao corpus com um clique.
+
+### GPU ou CPU
+
+`--dispositivo auto` (padrão) usa a GPU quando existe e cai para CPU quando não.
+Em CPU o treino é muito mais lento, mas o resultado é o mesmo, o que permite
+reproduzir o trabalho em qualquer máquina. Veja `requirements.txt` para instalar
+o torch em cada modo.
 
 ## Arquivos de configuração
 

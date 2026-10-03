@@ -136,3 +136,95 @@ details[open] > summary { margin-bottom: 10px; }
 .passos li { padding: 3px 0; }
 
 .paginacao { display: flex; justify-content: space-between; align-items: center; }
+
+/* Corpus, modelos e playground */
+
+.indicador-caixa {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  background: #fbfcfd;
+}
+.indicador-caixa .numero { font-size: 24px; font-weight: 600; }
+
+.barra {
+  flex: 1;
+  height: 8px;
+  background: #e8ebf0;
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.barra-preenchida { display: block; height: 100%; background: var(--acento); }
+.barra-preenchida.regra { background: var(--verde); }
+
+label.caixa {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+label.caixa:hover { border-color: var(--acento); }
+label.caixa.escolhida { border-color: var(--acento); background: #eef4fb; }
+.escolha-grande label.caixa { font-size: 14px; padding: 12px 16px; }
+
+pre.comando {
+  background: #14243c;
+  color: #dbe6f5;
+  padding: 14px 16px;
+  border-radius: 7px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+code {
+  background: #eceef2;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+tr.melhor-linha { background: #f0f7f3; }
+.sem-suporte { color: var(--vermelho); }
+
+table.matriz th { font-size: 12px; white-space: nowrap; }
+table.matriz td.celula {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  /* O tom cresce com a contagem, para a diagonal salta ao olho */
+  background: color-mix(in srgb, var(--acento) calc(var(--intensidade, 0) * 55%), #fff);
+}
+table.matriz td.celula.diagonal {
+  background: color-mix(in srgb, var(--verde) calc(var(--intensidade, 0) * 55%), #fff);
+  font-weight: 600;
+}
+
+.abas { gap: 4px; border-bottom: 1px solid var(--borda); margin-bottom: 14px; }
+.aba {
+  padding: 8px 12px;
+  text-decoration: none;
+  color: var(--suave);
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+}
+.aba.ativa { color: var(--acento); border-bottom-color: var(--acento); font-weight: 600; }
+
+.previsao { font-size: 20px; font-weight: 600; margin: 6px 0; }
+.previsao .suave { font-size: 13px; font-weight: 400; }
+
+.confianca-linha { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+.confianca-nome { width: 230px; font-size: 13px; color: var(--suave); }
+.confianca-nome.forte { color: var(--texto); font-weight: 600; }
+.confianca-valor { width: 50px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }

@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% macro barra(valor, total, classe='') %}
+  {% set pct = (100 * valor / total) if total else 0 %}
+  <div class="barra"><span class="barra-preenchida {{ classe }}" style="width: {{ pct }}%"></span></div>
+{% endmacro %}
+
+{% block conteudo %}
+<div class="entre">
+  <div>
+    <h1>Corpus de treino</h1>
+    <p class="suave">
+      Notícias rotuladas à mão que ensinam os classificadores. O link e o texto
+      ficam guardados para que a origem de cada rótulo seja demonstrável.
+    </p>
+  </div>
+  <div class="linha">
+    <a href="{{ url_for('corpus_exportar', **filtros_ativos) }}">
+      <button class="secundario">Baixar corpus (.xlsx)</button>
+    </a>
+    <a href="{{ url_for('corpus_anotar') }}"><button>Anotar pendentes</button></a>
+  </div>
+</div>
+
+<div class="cartao">
+  <h2>Situação do corpus</h2>
+  <div class="linha">
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.total }}</span>
+      <span class="suave">notícias</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.positivos }}</span>
+      <span class="suave">com disparo de arma de fogo</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.negativos }}</span>
+      <span class="suave">sem disparo</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.nao_rotulados }}</span>
+      <span class="suave">sem rótulo</span>
+    </div>
+  </div>
+
+  <h3 style="margin-top:18px">Prontidão por tarefa</h3>
+  <table>
+    <thead><tr><th>Tarefa</th><th>Pode treinar</th><th>Observação</th></tr></thead>
+    <tbody>
+      {% for tarefa, rotulo in {'violencia': 'Violência armada (binária)', 'motivacao': 'Motivação principal', 'indicadores': 'Indicadores de texto'}.items() %}
+        {% set p = estatisticas.prontidao[tarefa] %}
+        <tr>
+          <td>{{ rotulo }}</td>
+          <td>
+            <span class="status status-{{ 'aprovado' if p.pode_treinar else 'nao_aprovado' }}">
+              {{ 'sim' if p.pode_treinar else 'não' }}
+            </span>
+          </td>
+          <td class="suave">{{ p.motivo }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="suave" style="margin-top:10px">
+    A premissa da primeira tarefa é <strong>disparo de arma de fogo</strong>. Ela
+    precisa dos dois lados: um corpus só com casos positivos não ensina o modelo
+    a recusar nada, e a matriz de confusão fica sem as colunas que mostram o erro
+    que importa. Abaixo de {{ estatisticas.minimo_por_classe }} exemplos numa
+    classe, a métrica dela oscila muito e não sustenta conclusão.
+  </p>
+</div>
+
+<div class="cartao">
+  <details>
+    <summary>Distribuição por motivação ({{ estatisticas.motivos.values() | sum }} rotuladas, {{ estatisticas.sem_motivo }} positivas sem motivação)</summary>
+    <table>
+      <thead><tr><th>Motivação</th><th style="width:45%">Exemplos</th><th>N</th></tr></thead>
+      <tbody>
+        {% set maximo = [estatisticas.motivos.values() | max, 1] | max %}
+        {% for slug, n in estatisticas.motivos | dictsort(by='value', reverse=true) %}
+        <tr>
+          <td>{{ slug }}</td>
+          <td>{{ barra(n, maximo, 'regra' if n >= estatisticas.minimo_por_classe else '') }}</td>
+          <td>{{ n }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+
+  <details style="margin-top:10px">
+    <summary>Distribuição por indicador de texto</summary>
+    <table>
+      <thead><tr><th>Indicador</th><th style="width:45%">Exemplos</th><th>N</th></tr></thead>
+      <tbody>
+        {% set maximo_i = [estatisticas.indicadores.values() | max, 1] | max %}
+        {% for slug, n in estatisticas.indicadores | dictsort(by='value', reverse=true) %}
+        <tr>
+          <td>{{ slug }}</td>
+          <td>{{ barra(n, maximo_i, 'regra' if n >= estatisticas.minimo_por_classe else '') }}</td>
+          <td>{{ n }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</div>
+
+<div class="cartao" id="nova">
+  <h2>Adicionar notícia ao corpus</h2>
+  <form method="post" action="{{ url_for('corpus_adicionar') }}">
+    <div class="linha">
+      <div style="flex:2">
+        <label for="link">Link da notícia</label>
+        <input id="link" name="link" placeholder="https://...">
+      </div>
+      <div style="flex:2">
+        <label for="titulo">Título</label>
+        <input id="titulo" name="titulo" placeholder="Manchete da notícia">
+      </div>
+    </div>
+
+    <label for="texto" style="margin-top:10px">Texto da notícia</label>
+    <textarea id="texto" name="texto" rows="8" required placeholder="Cole aqui o texto"></textarea>
+
+    <div class="linha" style="margin-top:12px">
+      <div>
+        <label for="violencia_armada">Houve disparo de arma de fogo?</label>
+        <select id="violencia_armada" name="violencia_armada">
+          <option value="nao_rotulado">— rotular depois —</option>
+          <option value="sim">Sim, é violência armada</option>
+          <option value="nao">Não</option>
+        </select>
+      </div>
+      <div>
+        <label for="motivo_principal">Motivação principal</label>
+        <select id="motivo_principal" name="motivo_principal">
+          <option value="">— não definida —</option>
+          {% for categoria in motivacoes %}
+            <option value="{{ categoria.nome }}">{{ categoria.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="flex:2">
+        <label>Indicadores de texto</label>
+        <div class="linha">
+          {% for indicador in indicadores_texto %}
+            <label class="caixa">
+              <input type="checkbox" name="indicadores" value="{{ indicador.nome }}">
+              {{ indicador.rotulo }}
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <label for="observacao" style="margin-top:10px">Observação do anotador</label>
+    <input id="observacao" name="observacao" placeholder="Por que este rótulo, em caso de dúvida">
+
+    <div class="linha" style="margin-top:12px">
+      <button type="submit">Salvar e abrir</button>
+      <button type="submit" name="continuar" value="1" class="secundario">Salvar e adicionar outra</button>
+    </div>
+  </form>
+</div>
+
+<div class="cartao">
+  <h2>Divisão treino / validação / teste</h2>
+  <p class="suave">
+    O sorteio é estratificado por violência e motivação, para que nenhuma classe
+    rara fique inteira de um lado só, e fica <strong>gravado</strong>: refazer a
+    divisão a cada treino mudaria o conjunto de teste e tornaria os modelos
+    incomparáveis entre si. Rode de novo só quando adicionar notícias.
+  </p>
+  <form method="post" action="{{ url_for('corpus_dividir') }}" class="linha">
+    <div>
+      <label for="semente">Semente</label>
+      <input id="semente" name="semente" type="number" value="42" style="width:110px">
+    </div>
+    <div style="align-self:end">
+      <button type="submit">Sortear divisão</button>
+    </div>
+  </form>
+</div>
+
+<div class="cartao">
+  <h2>Importar planilha</h2>
+  <p class="suave">
+    Colunas aceitas: <code>link</code>, <code>titulo</code>, <code>texto</code>
+    (obrigatória), <code>violencia_armada</code> (sim/nao), <code>motivo_principal</code>,
+    <code>indicadores</code> (separados por vírgula) e <code>observacao</code>.
+  </p>
+  <form method="post" action="{{ url_for('corpus_importar') }}" enctype="multipart/form-data" class="linha">
+    <div style="flex:2">
+      <input type="file" name="arquivo" accept=".xlsx" required>
+    </div>
+    <div><button type="submit" class="secundario">Importar</button></div>
+  </form>
+</div>
+
+<div class="cartao">
+  <div class="entre">
+    <h2>Notícias do corpus</h2>
+    <span class="suave">{{ total }} resultado(s){% if total %} · página {{ pagina }} de {{ paginas }}{% endif %}</span>
+  </div>
+
+  <form method="get" class="linha" style="margin-bottom:14px">
+    <div>
+      <label for="f_violencia">Rótulo binário</label>
+      <select id="f_violencia" name="violencia_armada">
+        <option value="">Todos</option>
+        <option value="sim" {% if filtros.violencia_armada == 'sim' %}selected{% endif %}>Violência armada</option>
+        <option value="nao" {% if filtros.violencia_armada == 'nao' %}selected{% endif %}>Não é</option>
+        <option value="nao_rotulado" {% if filtros.violencia_armada == 'nao_rotulado' %}selected{% endif %}>Sem rótulo</option>
+      </select>
+    </div>
+    <div>
+      <label for="f_motivo">Motivação</label>
+      <select id="f_motivo" name="motivo_principal">
+        <option value="">Todas</option>
+        <option value="sem_motivo" {% if filtros.motivo_principal == 'sem_motivo' %}selected{% endif %}>Positiva sem motivação</option>
+        {% for categoria in motivacoes %}
+          <option value="{{ categoria.nome }}" {% if filtros.motivo_principal == categoria.nome %}selected{% endif %}>{{ categoria.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="f_particao">Partição</label>
+      <select id="f_particao" name="particao">
+        <option value="">Todas</option>
+        {% for p in ['treino', 'validacao', 'teste'] %}
+          <option value="{{ p }}" {% if filtros.particao == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="flex:2">
+      <label for="f_busca">Buscar no texto, título ou link</label>
+      <input id="f_busca" name="busca" value="{{ filtros.busca }}">
+    </div>
+    <div style="align-self:end" class="linha">
+      <button type="submit">Buscar</button>
+      {% if filtros_ativos %}
+        <a href="{{ url_for('corpus_repositorio') }}"><button class="secundario" type="button">Limpar</button></a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if not noticias %}
+    <p class="suave">Nenhuma notícia com esses filtros.</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr><th>#</th><th>Notícia</th><th>Disparo</th><th>Motivação</th><th>Indicadores</th><th>Partição</th></tr>
+    </thead>
+    <tbody>
+      {% for n in noticias %}
+      <tr>
+        <td><a href="{{ url_for('corpus_noticia', noticia_id=n.id) }}">{{ n.id }}</a></td>
+        <td>
+          <a href="{{ url_for('corpus_noticia', noticia_id=n.id) }}">
+            {{ n.titulo or (n.texto[:70] ~ '...') }}
+          </a>
+          {% if n.link %}<br><span class="suave">{{ n.link[:60] }}</span>{% endif %}
+        </td>
+        <td>
+          {% if n.violencia_armada == 1 %}<span class="etiqueta regra">sim</span>
+          {% elif n.violencia_armada == 0 %}<span class="etiqueta">não</span>
+          {% else %}<span class="suave">—</span>{% endif %}
+        </td>
+        <td>{{ n.motivo_principal or '—' }}</td>
+        <td>
+          {% for i in n.indicadores %}<span class="etiqueta texto">{{ i }}</span>{% endfor %}
+          {% if not n.indicadores %}<span class="suave">—</span>{% endif %}
+        </td>
+        <td class="suave">{{ n.particao or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+{% if paginas > 1 %}
+<div class="cartao paginacao">
+  {% if pagina > 1 %}
+    <a href="{{ url_for('corpus_repositorio', pagina=pagina-1, **filtros_ativos) }}">← Anterior</a>
+  {% else %}<span class="suave">← Anterior</span>{% endif %}
+  <span class="suave">Página {{ pagina }} de {{ paginas }}</span>
+  {% if pagina < paginas %}
+    <a href="{{ url_for('corpus_repositorio', pagina=pagina+1, **filtros_ativos) }}">Próxima →</a>
+  {% else %}<span class="suave">Próxima →</span>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

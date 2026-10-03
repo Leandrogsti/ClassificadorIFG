@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% macro confianca(nome, valor, destaque=false) %}
+<div class="confianca-linha">
+  <span class="confianca-nome {{ 'forte' if destaque }}">{{ nome }}</span>
+  <div class="barra"><span class="barra-preenchida {{ 'regra' if destaque }}" style="width: {{ 100 * valor }}%"></span></div>
+  <span class="confianca-valor">{{ '%.3f' | format(valor) }}</span>
+</div>
+{% endmacro %}
+
+{% block conteudo %}
+<h1>Testar os classificadores</h1>
+<p class="suave">
+  Cole uma notícia e veja o que o modelo responde <strong>antes da camada de
+  LLM</strong>. É aqui que se julga se a LLM está corrigindo o classificador ou
+  apenas repetindo-o.
+</p>
+
+<div class="cartao">
+  <div class="linha abas">
+    {% for chave, rotulo in [
+      ('violencia', 'Etapa 1 — É violência armada?'),
+      ('motivacao', 'Etapa 2 — Motivação'),
+      ('indicadores', 'Etapa 2 — Indicadores'),
+      ('pipeline', 'As duas etapas encadeadas')
+    ] %}
+      <a href="{{ url_for('testar', etapa=chave) }}"
+         class="aba {{ 'ativa' if etapa == chave }}">{{ rotulo }}</a>
+    {% endfor %}
+  </div>
+
+  {% if etapa == 'violencia' %}
+    <p class="suave">
+      Premissa única: a notícia relata <strong>disparo de arma de fogo</strong>.
+      Ameaça com arma sem tiro, apreensão de arma ou agressão sem disparo devem
+      sair como "não".
+    </p>
+  {% elif etapa == 'pipeline' %}
+    <p class="suave">
+      Encadeia como em produção: a motivação e os indicadores só são calculados
+      se a notícia passar pelo filtro da etapa 1.
+    </p>
+  {% endif %}
+
+  {% if faltando %}
+    <p class="aviso aviso-aviso">
+      Não há modelo treinado para <strong>{{ faltando | join(', ') }}</strong>.
+      <a href="{{ url_for('corpus_repositorio') }}">Rotule notícias no corpus</a> e
+      rode <code>python rodar_treino.py --dividir --tarefa {{ faltando[0] }}</code>.
+    </p>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('testar', etapa=etapa) }}">
+    <label for="texto">Texto da notícia</label>
+    <textarea id="texto" name="texto" rows="10" required
+              placeholder="Cole aqui a notícia que quer testar">{{ texto }}</textarea>
+    <button type="submit" style="margin-top:10px">Classificar</button>
+  </form>
+</div>
+
+{% if erro %}
+  <p class="aviso aviso-erro">{{ erro }}</p>
+{% endif %}
+
+{% if resultado and etapa != 'pipeline' %}
+<div class="cartao">
+  <h2>Resposta do modelo</h2>
+  {% if resultado.previsto is string %}
+    <p class="previsao">
+      {{ resultado.previsto }}
+      <span class="suave">confiança {{ '%.1f' | format(100 * resultado.confianca_previsto) }}%</span>
+    </p>
+    {% if etapa == 'motivacao' and motivacoes.get(resultado.previsto) %}
+      <p class="suave">{{ motivacoes[resultado.previsto].definicao }}</p>
+    {% endif %}
+  {% else %}
+    <p class="previsao">
+      {% if resultado.previsto %}{{ resultado.previsto | join(', ') }}
+      {% else %}<span class="suave">nenhum indicador acima do limiar {{ resultado.limiar }}</span>{% endif %}
+    </p>
+  {% endif %}
+
+  <h3 style="margin-top:14px">Confiança por classe</h3>
+  {% for nome, valor in resultado.confianca | dictsort(by='value', reverse=true) %}
+    {{ confianca(nome, valor, nome == resultado.previsto or (resultado.previsto is not string and nome in resultado.previsto)) }}
+  {% endfor %}
+  <p class="suave" style="margin-top:10px">
+    Acerto com confiança 0,51 e acerto com 0,99 dizem coisas muito diferentes
+    sobre quando confiar no filtro e quando deixar a decisão para a LLM.
+  </p>
+</div>
+{% endif %}
+
+{% if resultado and etapa == 'pipeline' %}
+<div class="cartao">
+  <h2>Etapa 1 — Violência armada</h2>
+  <p class="previsao">
+    {{ resultado.violencia.previsto }}
+    <span class="suave">confiança {{ '%.1f' | format(100 * resultado.violencia.confianca_previsto) }}%</span>
+  </p>
+  {% for nome, valor in resultado.violencia.confianca | dictsort(by='value', reverse=true) %}
+    {{ confianca(nome, valor, nome == resultado.violencia.previsto) }}
+  {% endfor %}
+</div>
+
+{% if resultado.get('interrompido_em') %}
+  <p class="aviso aviso-aviso">
+    O pipeline parou na etapa 1: a notícia não foi classificada como violência
+    armada, então a motivação e os indicadores não são calculados. É esse filtro
+    que evita gastar chamada de LLM com notícia fora do escopo.
+  </p>
+{% else %}
+  {% for tarefa, titulo in [('motivacao', 'Etapa 2 — Motivação'), ('indicadores', 'Etapa 2 — Indicadores')] %}
+    {% if resultado.get(tarefa) %}
+    <div class="cartao">
+      <h2>{{ titulo }}</h2>
+      <p class="previsao">
+        {% if resultado[tarefa].previsto is string %}{{ resultado[tarefa].previsto }}
+        {% elif resultado[tarefa].previsto %}{{ resultado[tarefa].previsto | join(', ') }}
+        {% else %}<span class="suave">nenhum acima do limiar</span>{% endif %}
+      </p>
+      {% for nome, valor in resultado[tarefa].confianca | dictsort(by='value', reverse=true) %}
+        {% if loop.index <= 5 %}
+          {{ confianca(nome, valor, nome == resultado[tarefa].previsto or (resultado[tarefa].previsto is not string and nome in resultado[tarefa].previsto)) }}
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="cartao">
+      <h2>{{ titulo }}</h2>
+      <p class="suave">Sem modelo treinado para esta tarefa.</p>
+    </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{% endif %}
+
+{% if texto %}
+<div class="cartao">
+  <h2>O modelo errou?</h2>
+  <p class="suave">
+    Mande este texto para o corpus e rotule à mão. É assim que um erro visto no
+    teste vira exemplo de treino em vez de só uma observação perdida.
+  </p>
+  <form method="post" action="{{ url_for('testar_salvar') }}">
+    <input type="hidden" name="texto" value="{{ texto }}">
+    <div class="linha">
+      <div style="flex:2">
+        <label for="link">Link da notícia (opcional)</label>
+        <input id="link" name="link" placeholder="https://...">
+      </div>
+      <div style="align-self:end">
+        <button type="submit" class="secundario">Enviar ao corpus</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

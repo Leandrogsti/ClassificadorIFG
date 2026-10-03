@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% macro metrica(valor) %}{{ '%.3f' | format(valor) if valor is not none else '—' }}{% endmacro %}
+
+{% block conteudo %}
+<div class="entre">
+  <div>
+    <h1>Execução #{{ execucao.id }}</h1>
+    <p class="suave">
+      {{ catalogo.get(execucao.modelo, {}).get('rotulo', execucao.modelo) }} ·
+      tarefa <strong>{{ execucao.tarefa }}</strong> ·
+      {{ execucao.criado_em[:16].replace('T', ' ') }} ·
+      {{ execucao.dispositivo }} · {{ '%.0f' | format(execucao.duracao_s or 0) }}s
+    </p>
+  </div>
+  <a href="{{ url_for('modelos') }}"><button class="secundario">Voltar aos modelos</button></a>
+</div>
+
+{% if execucao.erro %}
+  <p class="aviso aviso-erro">Esta execução falhou: {{ execucao.erro }}</p>
+{% endif %}
+
+<div class="cartao">
+  <h2>Hiperparâmetros</h2>
+  <table>
+    <tbody>
+      {% for chave, valor in execucao.hiperparametros.items() %}
+        <tr><th>{{ chave }}</th><td>{{ valor }}</td></tr>
+      {% endfor %}
+      <tr><th>exemplos (treino / validação / teste)</th>
+          <td>{{ execucao.n_treino }} / {{ execucao.n_validacao }} / {{ execucao.n_teste }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if execucao.metricas %}
+{% set m = execucao.metricas %}
+<div class="cartao">
+  <h2>Métricas no conjunto de teste</h2>
+  <div class="linha">
+    <div class="indicador-caixa">
+      <span class="numero">{{ metrica(m.get('acuracia', m.get('acuracia_subconjunto'))) }}</span>
+      <span class="suave">{{ 'acurácia' if m.get('acuracia') is not none else 'acurácia de subconjunto' }}</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ metrica(m.precisao_macro) }}</span>
+      <span class="suave">precisão macro</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ metrica(m.recall_macro) }}</span>
+      <span class="suave">recall macro</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ metrica(m.f1_macro) }}</span>
+      <span class="suave">F1 macro</span>
+    </div>
+  </div>
+  <p class="suave" style="margin-top:10px">
+    {% if m.get('f1_ponderado') is not none %}
+      Ponderado pelo suporte: precisão {{ metrica(m.precisao_ponderada) }},
+      recall {{ metrica(m.recall_ponderado) }}, F1 {{ metrica(m.f1_ponderado) }}.
+    {% endif %}
+    {% if m.get('f1_micro') is not none %}
+      Micro: precisão {{ metrica(m.precisao_micro) }},
+      recall {{ metrica(m.recall_micro) }}, F1 {{ metrica(m.f1_micro) }}.
+    {% endif %}
+  </p>
+</div>
+
+<div class="cartao">
+  <h2>Métricas por classe</h2>
+  <table>
+    <thead><tr><th>Classe</th><th>Precisão</th><th>Recall</th><th>F1</th><th>Suporte</th></tr></thead>
+    <tbody>
+      {% for classe, valores in m.por_classe.items() %}
+      <tr>
+        <td>{{ classe }}</td>
+        <td>{{ metrica(valores.precisao) }}</td>
+        <td>{{ metrica(valores.recall) }}</td>
+        <td>{{ metrica(valores.f1) }}</td>
+        <td class="{{ 'suave' if valores.suporte else 'sem-suporte' }}">{{ valores.suporte }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="suave" style="margin-top:10px">
+    Suporte é quantos exemplos daquela classe havia no teste. Classe com suporte
+    zero não foi medida: o F1 dela aparece como 0 por convenção, não por erro do
+    modelo.
+  </p>
+</div>
+
+{% if m.get('matriz_confusao') %}
+<div class="cartao">
+  <h2>Matriz de confusão</h2>
+  <p class="suave">
+    Linhas são o rótulo verdadeiro, colunas a previsão do modelo. A diagonal são
+    os acertos; cada célula fora dela mostra com o que o modelo confundiu a classe.
+  </p>
+  <div style="overflow-x:auto">
+    <table class="matriz">
+      <thead>
+        <tr>
+          <th>verdadeiro \ previsto</th>
+          {% for classe in execucao.rotulos %}<th>{{ classe }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% set maximo = m.matriz_confusao | map('max') | max %}
+        {% for linha in m.matriz_confusao %}
+        <tr>
+          <th>{{ execucao.rotulos[loop.index0] }}</th>
+          {% set i = loop.index0 %}
+          {% for celula in linha %}
+            <td class="celula {{ 'diagonal' if i == loop.index0 }}"
+                style="--intensidade: {{ (celula / maximo) if maximo else 0 }}">
+              {{ celula }}
+            </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if m.get('matrizes_por_classe') %}
+<div class="cartao">
+  <h2>Matrizes de confusão por indicador</h2>
+  <p class="suave">
+    Tarefa multirrótulo: cada indicador tem a sua própria matriz 2x2, porque uma
+    notícia pode receber vários ao mesmo tempo.
+  </p>
+  <div class="linha" style="flex-wrap:wrap">
+    {% for classe, matriz in m.matrizes_por_classe.items() %}
+    <div style="min-width:240px">
+      <h3>{{ classe }}</h3>
+      <table class="matriz">
+        <thead><tr><th></th><th>prev. não</th><th>prev. sim</th></tr></thead>
+        <tbody>
+          <tr><th>real não</th><td class="celula diagonal">{{ matriz[0][0] }}</td><td class="celula">{{ matriz[0][1] }}</td></tr>
+          <tr><th>real sim</th><td class="celula">{{ matriz[1][0] }}</td><td class="celula diagonal">{{ matriz[1][1] }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if execucao.historico %}
+<div class="cartao">
+  <h2>Aprendizado por época</h2>
+  <table>
+    <thead><tr><th>Época</th><th>Perda no treino</th><th>F1 macro na validação</th></tr></thead>
+    <tbody>
+      {% for linha in execucao.historico %}
+      <tr>
+        <td>{{ linha.epoca }}</td>
+        <td>{{ '%.4f' | format(linha.perda_treino) }}</td>
+        <td>{{ metrica(linha.get('f1_macro_validacao')) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="suave" style="margin-top:10px">
+    Perda caindo com F1 de validação parado ou piorando é sinal de sobreajuste:
+    o modelo está decorando o treino em vez de generalizar.
+  </p>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

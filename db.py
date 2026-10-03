@@ -106,6 +106,54 @@ CREATE TABLE IF NOT EXISTS alerta_duplicidade (
 );
 
 CREATE INDEX IF NOT EXISTS idx_alerta_ocorrencia ON alerta_duplicidade(ocorrencia_id);
+
+-- Corpus de treino, separado das ocorrências de produção: aqui a notícia é um
+-- exemplo rotulado à mão, não um fato registrado. Guarda link e texto para que
+-- a origem de cada rótulo seja demonstrável.
+CREATE TABLE IF NOT EXISTS corpus_noticia (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    link             TEXT,
+    titulo           TEXT,
+    texto            TEXT NOT NULL,
+    -- Etapa 1: houve disparo de arma de fogo? 1 sim, 0 não, NULL não rotulado.
+    violencia_armada INTEGER,
+    -- Etapa 2, só quando violencia_armada = 1.
+    motivo_principal TEXT,
+    indicadores      TEXT,
+    observacao       TEXT,
+    anotador         TEXT,
+    -- treino/validacao/teste, fixada no primeiro sorteio para que a divisão
+    -- não mude entre execuções e os resultados sejam comparáveis.
+    particao         TEXT,
+    criado_em        TEXT NOT NULL,
+    atualizado_em    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_corpus_violencia ON corpus_noticia(violencia_armada);
+CREATE INDEX IF NOT EXISTS idx_corpus_motivo ON corpus_noticia(motivo_principal);
+
+-- Uma linha por (tarefa, modelo, hiperparâmetros) treinado, com as métricas
+-- medidas no conjunto de teste.
+CREATE TABLE IF NOT EXISTS treino_execucao (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    tarefa           TEXT NOT NULL,
+    modelo           TEXT NOT NULL,
+    hiperparametros  TEXT NOT NULL,
+    metricas         TEXT,
+    matriz_confusao  TEXT,
+    rotulos          TEXT,
+    historico        TEXT,
+    n_treino         INTEGER,
+    n_validacao      INTEGER,
+    n_teste          INTEGER,
+    duracao_s        REAL,
+    dispositivo      TEXT,
+    caminho_modelo   TEXT,
+    erro             TEXT,
+    criado_em        TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_treino_tarefa ON treino_execucao(tarefa);
 """
 
 

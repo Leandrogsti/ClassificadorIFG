@@ -4,6 +4,23 @@ openpyxl>=3.1
 python-dotenv>=1.2
 spacy>=3.8
 
-# Só necessário para ativar o filtro BERTimbau (BERTIMBAU_MODELO no .env)
+# Treino e avaliação dos classificadores
 transformers>=5.0
+accelerate>=1.0
+scikit-learn>=1.5
+numpy>=2.0
+
+# ATENÇÃO ao torch: `pip install -r requirements.txt` instala a versão só-CPU,
+# que funciona em qualquer máquina e é a usada para reproduzir o trabalho sem
+# placa de vídeo. Para treinar na GPU (NVIDIA), instale o torch com CUDA ANTES
+# ou DEPOIS deste arquivo, substituindo a versão CPU:
+#
+#     pip install torch --index-url https://download.pytorch.org/whl/cu126
+#
+# Para voltar à versão CPU:
+#
+#     pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# O código não muda: `--dispositivo auto` usa a GPU quando ela existe e cai para
+# CPU quando não. Em CPU o treino é muito mais lento, mas o resultado é o mesmo.
 torch>=2.0
