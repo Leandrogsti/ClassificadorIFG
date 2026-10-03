@@ -167,6 +167,25 @@ Em CPU o treino é muito mais lento, mas o resultado é o mesmo, o que permite
 reproduzir o trabalho em qualquer máquina. Veja `requirements.txt` para instalar
 o torch em cada modo.
 
+## Documentação do TCC
+
+`docs/TCC-Classificador-Violencia-Armada.docx` traz método, implementação e
+protocolo de avaliação: fundamentação, construção do corpus, divisão amostral,
+modelos comparados, busca de hiperparâmetros, métricas, reprodutibilidade em
+GPU e CPU, limitações e ameaças à validade, mais apêndices com as categorias,
+os indicadores e as diretrizes de anotação.
+
+```bash
+pip install python-docx
+python gerar_documentacao.py
+```
+
+As tabelas de apêndice são geradas a partir de `categorias_fonte.json`,
+`indicadores_fonte.json` e do catálogo de modelos — alterar uma categoria e
+regerar mantém o documento em dia com o sistema, em vez de deixar os dois
+divergirem em silêncio. A seção de resultados é um esqueleto a preencher com a
+saída real do treino.
+
 ## Arquivos de configuração
 
 - `categorias_fonte.json` — motivações; rode `python gerar_dicionario.py` após

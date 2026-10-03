@@ -24,3 +24,4 @@ numpy>=2.0
 # O código não muda: `--dispositivo auto` usa a GPU quando ela existe e cai para
 # CPU quando não. Em CPU o treino é muito mais lento, mas o resultado é o mesmo.
 torch>=2.0
+python-docx>=1.2
