@@ -111,9 +111,11 @@
   </table>
   </div>
   <p class="suave" style="margin-top:10px">
-    O treino roda igual nos dois: <code>--dispositivo auto</code> usa a GPU quando
-    existe e cai para CPU quando não. Em CPU é bem mais lento, mas o resultado é o
-    mesmo, o que permite reproduzir o trabalho em qualquer máquina.
+    O treino roda nos dois: <code>--dispositivo auto</code> usa a GPU quando
+    existe e cai para CPU quando não. Em CPU é bem mais lento, mas roda na
+    máquina que houver. A semente fixa repete a divisão, os pesos iniciais e a
+    ordem dos lotes — em CPU isso basta para o mesmo número sair de novo; em
+    GPU as métricas batem só nas primeiras casas decimais.
   </p>
 </div>
 

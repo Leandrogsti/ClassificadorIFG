@@ -6,6 +6,11 @@ circunstância, corporação, patente, situação de serviço, unidade — não 
 nenhum conjunto de referência: cada erro era encontrado a olho, um registro de
 cada vez, e cada mudança de prompt era aprovada por impressão.
 
+O QUE O OURO AINDA NÃO COBRE. Os casos atuais conferem nome, situação, gênero,
+tipo de vítima e local. Ficam de fora, por enquanto, as CIRCUNSTÂNCIAS, a
+UNIDADE do agente e a COR/RAÇA — um número bom aqui não diz nada sobre esses
+três campos. Acrescentar casos que os cubram é o próximo passo.
+
 Com isto, mexer no prompt vira medida. Rode antes e depois da mudança e compare
 os números.
 

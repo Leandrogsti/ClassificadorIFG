@@ -166,8 +166,10 @@ def adicionar(con, dados: dict, anotador: str) -> int:
     chama sozinho antes de começar. Ver `pendentes_de_particao` para o porquê.
 
     `aprovada` fica 0 a menos que quem chama passe `aprovada` explicitamente.
-    Só a aprovação de uma ocorrência passa — ali um sênior já conferiu o
-    rótulo. A rotulagem na fila e a importação de planilha não passam, e o
+    A aprovação de uma ocorrência passa — ali um sênior já conferiu o rótulo —
+    e a importação de planilha TAMBÉM passa, quando quem importa marca a caixa
+    "já aprovar para o treino": é uma decisão de quem traz a planilha, e a
+    responsabilidade pelo rótulo é dela. A rotulagem na fila não passa, e o
     exemplo espera revisão em /corpus antes de treinar.
     """
     texto = dados["texto"].strip()

@@ -11,10 +11,13 @@ estados, e "Bom Jesus" existe em cinco. Com a cidade como chave, quatro desses
 cinco receberiam a UF errada. Por isso a estrutura é estado → cidades →
 bairros, e o formulário pede o estado primeiro.
 
-DE ONDE VEM CADA NÍVEL:
+DE ONDE VEM CADA NÍVEL (tudo sai de `locais.json`, e NADA é consultado em
+tempo de execução — não há chamada ao IBGE neste código):
 
-- estados (27) e municípios (5.571): API de Localidades do IBGE. São oficiais e
-  completos.
+- estados (27) e municípios (5.571): INSTANTÂNEO da API de Localidades do IBGE,
+  tirado à mão e gravado no arquivo. São oficiais e completos na data em que
+  foram baixados; município criado ou renomeado depois disso só entra quando
+  alguém refizer o instantâneo.
 - bairros: NÃO existe lista pronta. O IBGE não publica esse nível — o endpoint
   `/localidades/bairros` responde 404 — e os distritos não substituem: o Rio de
   Janeiro tem UM distrito no IBGE e 164 bairros oficiais. Os que estão no

@@ -66,10 +66,13 @@ GLOSSARIO: dict[str, tuple[str, str]] = {
         "LLM",
         "Sigla em inglês para 'modelo de linguagem grande'. É o tipo de"
         " programa que conversa e escreve texto — a mesma família do ChatGPT."
-        " Aqui ele não decide quais indicadores a notícia tem: isso é trabalho"
-        " do BERT. O LLM entra depois, para APROFUNDAR dentro do que o BERT já"
-        " marcou — montar a lista de vítimas, preencher nome, idade, gênero e"
-        " as circunstâncias de cada uma.",
+        " Aqui ele quase nunca decide quais indicadores a notícia tem: isso é"
+        " trabalho do BERT, e o LLM entra depois para APROFUNDAR dentro do que"
+        " o BERT já marcou — montar a lista de vítimas, preencher nome, idade,"
+        " gênero e as circunstâncias de cada uma. A exceção é"
+        " `violencia_genero`, que não tem classe no BERT: feminicídio e"
+        " lgbtfobia são decididos pelo LLM, dentro dos blocos de"
+        " mulheres_baleadas e lgbtqiapn.",
     ),
     "prompt": (
         "Prompt",
@@ -724,11 +727,12 @@ TELAS["vitimas"] = {
          " altera a contagem e pode transformar o caso em chacina. O sistema"
          " recalcula os fenômenos sozinho quando a situação muda."),
         ("Edição rápida",
-         "Dá para corrigir na própria linha a cor/raça, a situação, a data da"
-         " morte e a descrição, sem abrir a ocorrência. São justamente os"
-         " campos que não vêm da notícia: a imprensa quase nunca informa"
-         " cor/raça, e o acompanhamento de 90 dias existe para corrigir a"
-         " situação de quem morreu depois."),
+         "Dá para corrigir na própria linha a cor/raça, a situação e a data da"
+         " morte, sem abrir a ocorrência. São justamente os campos que não vêm"
+         " da notícia: a imprensa quase nunca informa cor/raça, e o"
+         " acompanhamento de 90 dias existe para corrigir a situação de quem"
+         " morreu depois. A descrição não está aqui — para mudá-la, abra a"
+         " ocorrência."),
         ("Baixar planilha",
          "Gera a planilha só de vítimas, respeitando a busca que está na tela."
          " É a mesma aba 'vitima' do download da base completa, com cidade,"
@@ -798,8 +802,10 @@ TELAS["alertas"] = {
         " sistema para uma pessoa decidir.",
     "secoes": [
         ("Como o alerta aparece",
-         "O sistema compara registros por data, local e perfil das vítimas, e"
-         " levanta a suspeita. Ele NÃO une nada sozinho: juntar dois casos"
+         "O sistema compara TRÊS campos, e só eles: a data do caso, a cidade e"
+         " o bairro. Registros que batem nos três viram suspeita. O perfil das"
+         " vítimas NÃO entra nessa comparação — é justamente o que a pessoa"
+         " olha para decidir. Ele não une nada sozinho: juntar dois casos"
          " diferentes por engano é pior do que deixar dois registros do mesmo"
          " caso esperando alguém olhar."),
         ("Unificar",
@@ -833,12 +839,13 @@ TELAS["corpus_repositorio"] = {
         " pessoas, que é o que o programa imita para aprender.",
     "secoes": [
         ("Situação do corpus",
-         "Cinco números. TOTAL é tudo que está ali. ANOTADAS são as que já têm"
+         "Seis números. TOTAL é tudo que está ali. ANOTADAS são as que já têm"
          " uma decisão. APROVADAS são as que foram revisadas e podem treinar —"
          " só estas contam. ESPERANDO REVISÃO é a diferença entre as duas, e é"
          " a fila de trabalho de quem revisa. SEM NENHUM INDICADOR são os"
          " exemplos negativos, que ensinam o programa a recusar o que está"
-         " fora do escopo."),
+         " fora do escopo. NA FILA DE ANOTAÇÃO são as que ainda não têm"
+         " decisão nenhuma."),
         ("Distribuição por indicador",
          "Quantos exemplos aprovados cada indicador tem, em barras. É o"
          " número que decide se o treino pode rodar: são precisos 30 positivos"
@@ -992,9 +999,11 @@ TELAS["modelos"] = {
          " 96 na de uma rede por indicador — por isso a comparação entre"
          " estratégias costuma rodar com a grade reduzida."),
         ("Ambiente de execução",
-         "Qual placa de vídeo foi detectada, quanta memória ela tem e qual"
-         " versão das bibliotecas está instalada. Está aqui porque resultado"
-         " de treino sem o ambiente em que rodou não é reproduzível."),
+         "Qual placa de vídeo foi detectada, se o CUDA está disponível, qual"
+         " dispositivo está em uso e qual versão do torch está instalada. A"
+         " memória da placa não aparece aqui. Está nesta tela porque"
+         " resultado de treino sem o ambiente em que rodou não é"
+         " reproduzível."),
         ("Treinar",
          "Dispara o treino em segundo plano — dá para fechar a página. Antes"
          " de começar, o sistema distribui as notícias novas entre os três"
@@ -1103,7 +1112,10 @@ TELAS["testar"] = {
     "titulo": "Testar o classificador",
     "resumo":
         "Um campo de texto para colar uma notícia e ver o que o classificador"
-        " diz — antes de qualquer LLM e sem criar registro nenhum.",
+        " diz, antes de qualquer LLM. Não cria OCORRÊNCIA, mas grava sim um"
+        " registro: a entrada fica salva com origem 'playground', e a"
+        " classificação entra na auditoria — um erro visto aqui vale para o"
+        " próximo treino tanto quanto um de produção.",
     "secoes": [
         ("Classificar",
          "Cola-se o texto e o modelo responde. Aparecem TODOS os indicadores,"
@@ -1169,19 +1181,21 @@ TELAS["gestao"] = {
          " houver mulher baleada; sem a marcação, a instrução nem viaja no"
          " prompt e uma marcação que o LLM devolva assim mesmo é descartada."),
         ("Regra",
-         "Para os indicadores calculados: o campo da vítima, o valor"
-         " procurado, o mínimo e as exceções. A chacina é o exemplo completo —"
-         " conta os mortos, exceto o agente de segurança que estava em"
-         " serviço."),
+         "Para os indicadores calculados: a operação, o campo da vítima, o"
+         " valor procurado e o mínimo. As exceções NÃO são editáveis aqui —"
+         " elas moram no código. A chacina é o exemplo: a tela mostra que ela"
+         " conta mortos a partir de três, mas a exceção do agente de"
+         " segurança em serviço está em `indicadores.py`."),
         ("Saídas (tabelas complementares)",
          "O formato, em JSON, dos campos extras que este indicador exige do"
          " LLM: corporação e patente para o agente, partido e cargo para o"
          " político. JSON inválido ABORTA o salvamento, para que um erro de"
          " digitação não apague as tabelas."),
         ("Prompt enviado à LLM",
-         "A pré-visualização do bloco completo deste indicador, montado como"
-         " ele será enviado. Serve para conferir o texto antes de ele custar"
-         " uma chamada."),
+         "Mostra a SKILL crua deste indicador, como ela está gravada — e não o"
+         " bloco montado que de fato viaja, que inclui as listas fechadas e as"
+         " tabelas complementares. Serve para conferir o texto escrito aqui;"
+         " para ver a chamada inteira, use a pré-visualização em /testar."),
     ],
     "construcao":
         "Criar um indicador aqui funciona, mas não basta. Duas coisas não"

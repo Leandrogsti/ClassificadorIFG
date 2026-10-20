@@ -257,6 +257,12 @@ def enviar_ao_corpus(con, registro_id: int, analista: str) -> int:
     É aqui que o ciclo fecha: o erro visto na revisão vira treino. Usa a
     correção quando existe e a marcação do modelo quando o analista a
     confirmou sem mudar nada.
+
+    TAMBÉM ACEITA REGISTRO NÃO REVISADO, e isso é deliberado: ele entra com
+    `rotulada = ''`, ou seja, cai na fila de anotação de /corpus em vez de
+    virar exemplo pronto. O que vai junto é o texto e a marcação do modelo
+    como ponto de partida; quem decide continua sendo uma pessoa. Só o
+    registro revisado entra já rotulado.
     """
     import corpus
 

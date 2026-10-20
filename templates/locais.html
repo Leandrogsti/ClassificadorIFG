@@ -13,8 +13,10 @@
   <h2>Estados, cidades e bairros</h2>
   <p class="suave" style="margin-top:0">
     <strong>{{ estatisticas.estados }}</strong> estados e
-    <strong>{{ estatisticas.cidades }}</strong> municípios vêm da API de
-    Localidades do IBGE. Os <strong>{{ estatisticas.bairros }}</strong> bairros
+    <strong>{{ estatisticas.cidades }}</strong> municípios saíram da API de
+    Localidades do IBGE e estão gravados num arquivo JSON — um instantâneo,
+    tirado à mão. A aplicação NÃO consulta o IBGE: mudança de município só
+    entra aqui quando alguém refizer esse instantâneo. Os <strong>{{ estatisticas.bairros }}</strong> bairros
     em {{ estatisticas.cidades_com_bairro }} cidades foram conferidos à mão: o
     IBGE não publica bairros, e os distritos não substituem — o Rio de Janeiro
     tem um distrito e 164 bairros. Acrescente aqui conforme a cobertura crescer.

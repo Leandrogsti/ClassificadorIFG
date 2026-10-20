@@ -1,5 +1,5 @@
 {
-  "_leia_me": "Partidos com registro no TSE, usados no campo PARTIDO POLÍTICO da tabela de político baleado. Editar aqui basta: a lista alimenta o formulário e a validação.",
+  "_leia_me": "Valores aceitos no campo PARTIDO POLÍTICO da tabela de político baleado. A maior parte são partidos com registro no TSE, mas DOIS NÃO SÃO PARTIDO: 'Sem partido' e 'Não identificado' são respostas para quando não há filiação ou o texto não a informa, e estão na mesma lista para que o formulário ofereça as duas sem campo à parte. A lista alimenta o formulário, mas NÃO é fechada: uma sigla fora dela é preservada como a notícia a trouxe (ver `_complemento_politico` em classificador.py), porque o TSE muda a lista e perder o que a notícia disse seria pior. Editar aqui basta.",
   "partidos": [
     "AGIR",
     "AVANTE",
