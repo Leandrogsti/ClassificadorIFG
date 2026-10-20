@@ -39,7 +39,8 @@ from datetime import date
 
 from dotenv import load_dotenv
 from flask import (
-    Flask, flash, g, redirect, render_template, request, send_file, session, url_for
+    Flask, abort, flash, g, redirect, render_template, request, send_file,
+    session, url_for
 )
 
 import ajuda
@@ -670,6 +671,10 @@ def excluir_noticia(noticia_id: int):
     linha = con.execute(
         "SELECT ocorrencia_id FROM noticia WHERE id = ?", (noticia_id,)
     ).fetchone()
+    # Notícia já excluída — por duplo envio do formulário ou por link velho.
+    # Sem isto, o `linha["ocorrencia_id"]` abaixo estoura em 500.
+    if linha is None:
+        abort(404)
     ocorrencia_id = linha["ocorrencia_id"]
     with con:
         con.execute("DELETE FROM noticia WHERE id = ?", (noticia_id,))
@@ -1740,9 +1745,13 @@ def fila_recebidas():
         "estado": request.args.get("estado", ""),
         "busca": request.args.get("busca", "").strip(),
     }
-    pagina = max(1, int(request.args.get("pagina", 1) or 1))
     por_pagina = 20
     total = recebidas.contar(con, filtros)
+    paginas = max(1, -(-total // por_pagina))
+    try:
+        pagina = min(max(1, int(request.args.get("pagina", 1))), paginas)
+    except ValueError:
+        pagina = 1
     return render_template(
         "recebidas.html",
         lista=recebidas.listar(con, filtros, por_pagina, (pagina - 1) * por_pagina),
@@ -1755,7 +1764,7 @@ def fila_recebidas():
         defasagem=inferencia.defasagem(),
         filtros=filtros,
         pagina=pagina,
-        paginas=max(1, -(-total // por_pagina)),
+        paginas=paginas,
         total=total,
     )
 

@@ -45,8 +45,17 @@ teria com todos os cortes em 0,5: a diferença entre os dois é o efeito medido 
 calibração, não uma afirmação de que ela ajuda.
 
 Roda em GPU quando há uma disponível e em CPU quando não há, sem mudar nada no
-código: `dispositivo="auto"` resolve isso. Em CPU o treino é lento, mas o
-resultado é o mesmo, o que permite reproduzir o trabalho em qualquer máquina.
+código: `dispositivo="auto"` resolve isso. Em CPU o treino é lento, mas roda na
+máquina que houver.
+
+O QUE É REPRODUTÍVEL. A semente (`SEMENTE_PADRAO`, a mesma do sorteio da
+divisão) é fixada antes de cada rede, e com ela repetem-se a partição do
+corpus, os pesos iniciais da cabeça de classificação e a ordem dos lotes. Em
+CPU, isso basta para duas execuções da mesma configuração darem o mesmo
+número. Em GPU, NÃO: as operações acumulam em ordem variável entre os núcleos,
+e as métricas repetem só nas primeiras casas decimais. Comparação entre
+modelos, que é o que a tabela afirma, continua válida nos dois casos — é a
+igualdade dígito a dígito que não se promete em placa.
 """
 import json
 import time
@@ -58,6 +67,13 @@ import corpus
 from db import agora
 
 RAIZ = Path(__file__).parent
+
+# A MESMA semente do sorteio da divisão (`corpus.dividir`). Fixá-la aqui torna
+# repetível o que o treino sorteia: a inicialização da cabeça de classificação
+# e a ordem dos lotes do `DataLoader(shuffle=True)`. Não torna o treino
+# determinístico em GPU — os núcleos CUDA acumulam em ordem variável, e duas
+# execuções na mesma placa ainda diferem nas últimas casas decimais.
+SEMENTE_PADRAO = 42
 PASTA_MODELOS = RAIZ / "modelos"
 
 # O arquivo que a inferência lê para saber o que foi treinado: a estratégia, a
@@ -374,7 +390,7 @@ def _aplicar_limiares(probabilidades, rotulos: list[str],
 # --------------------------------------------------------------------------
 
 def _ajustar(modelo: str, hiper: dict, rotulos: list[str], conjuntos: dict,
-             aparelho: str) -> dict:
+             aparelho: str, semente: int = SEMENTE_PADRAO) -> dict:
     """Treina UMA rede e devolve as PROBABILIDADES de cada partição.
 
     Devolve probabilidade e não decisão: o corte vem depois, da calibração na
@@ -387,8 +403,13 @@ def _ajustar(modelo: str, hiper: dict, rotulos: list[str], conjuntos: dict,
     from torch.utils.data import DataLoader, Dataset
     from transformers import (
         AutoModelForSequenceClassification, AutoTokenizer,
-        get_linear_schedule_with_warmup,
+        get_linear_schedule_with_warmup, set_seed,
     )
+
+    # Antes de instanciar a rede: a semente precisa valer para os pesos
+    # iniciais da cabeça de classificação, que são sorteados em
+    # `from_pretrained`, e não só para a ordem dos lotes.
+    set_seed(semente)
 
     tokenizador = AutoTokenizer.from_pretrained(MODELOS[modelo]["id"])
     rede = AutoModelForSequenceClassification.from_pretrained(
@@ -617,6 +638,7 @@ def treinar(
     classes: list[str] | None = None,
     estrategia: str = ESTRATEGIA_PADRAO,
     progresso=None,
+    semente: int = SEMENTE_PADRAO,
 ) -> dict:
     """Treina uma estratégia numa tarefa e devolve as métricas no teste.
 
@@ -731,7 +753,7 @@ def treinar(
             for particao in corpus.PARTICOES
         }
         ajustada = _ajustar(
-            base_unidade, hiper, rotulos_unidade, conjuntos, aparelho
+            base_unidade, hiper, rotulos_unidade, conjuntos, aparelho, semente
         )
         colunas = [rotulos.index(n) for n in rotulos_unidade]
         for particao in ("validacao", "teste"):
@@ -1148,6 +1170,7 @@ def rodar_comparacao(
     progresso=None,
     classes: list[str] | None = None,
     estrategias: list[str] | None = None,
+    semente: int = SEMENTE_PADRAO,
 ) -> dict:
     """Treina cada modelo com cada configuração, em cada estratégia pedida.
 
@@ -1188,7 +1211,7 @@ def rodar_comparacao(
                     execucoes.append(
                         treinar(con, tarefa, modelo, hiper, dispositivo,
                                 salvar_modelo=False, classes=classes,
-                                estrategia=estrategia)
+                                estrategia=estrategia, semente=semente)
                     )
                 except Exception as erro:
                     detalhe = f"{type(erro).__name__}: {erro}"
@@ -1210,6 +1233,7 @@ def rodar_comparacao(
                 con, tarefa, melhor["modelo"], melhor["hiperparametros"],
                 dispositivo, salvar_modelo=True, registrar=False,
                 classes=classes, estrategia=melhor["estrategia"],
+                semente=semente,
             )
 
     return {

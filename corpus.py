@@ -304,9 +304,12 @@ def atualizar(con, noticia_id: int, dados: dict, anotador: str) -> None:
             rotulada,
             anotador,
             marca,
-            # Exemplo que saiu do treino não guarda vaga de partição: se
-            # voltar, `dividir` o sorteia de novo com o lote pendente.
-            particao if aprovada else None,
+            # Correção de rótulo NÃO devolve a vaga de partição ao sorteio,
+            # mesmo quando derruba a aprovação: reaprovar depois traria o
+            # exemplo de volta em outra partição, e um exemplo que atravessa
+            # do teste para o treino contamina a medição. Quem sai de vez sai
+            # por `aprovar(..., False)`, e é lá que a partição é limpa.
+            particao,
             aprovada,
             anotador if aprovada else None,
             momento if aprovada else None,

@@ -515,9 +515,15 @@ clique.
 ### GPU ou CPU
 
 `--dispositivo auto` (padrão) usa a GPU quando existe e cai para CPU quando não.
-Em CPU o treino é muito mais lento, mas o resultado é o mesmo, o que permite
-reproduzir o trabalho em qualquer máquina. Veja `requirements.txt` para instalar
-o torch em cada modo.
+Em CPU o treino é muito mais lento, mas roda na máquina que houver. Veja
+`requirements.txt` para instalar o torch em cada modo.
+
+O que a semente (`--semente`, padrão 42) garante: a mesma divisão do corpus, os
+mesmos pesos iniciais da cabeça de classificação e a mesma ordem dos lotes. Em
+CPU, repetir a mesma configuração dá o mesmo número. Em GPU não dá: os núcleos
+acumulam em ordem variável e as métricas batem só nas primeiras casas decimais.
+A comparação entre modelos vale nos dois casos; a igualdade dígito a dígito,
+só em CPU.
 
 ## Ajuda embutida (botão `? Ajuda`)
 

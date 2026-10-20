@@ -149,7 +149,8 @@ def main() -> None:
     # A MESMA trava da tela, sobre as classes REALMENTE pedidas. Sem isto, a
     # linha de comando seria um desvio silencioso do mínimo por classe: a tela
     # recusaria e `python rodar_treino.py` treinaria do mesmo jeito.
-    prontidao = corpus.estatisticas(con, classes)["prontidao"]["indicadores"]
+    prontidao_pedida = corpus.estatisticas(con, classes)["prontidao"]
+    prontidao = prontidao_pedida["indicadores"]
     if not prontidao["pode_treinar"]:
         print(f"\nTREINO NÃO INICIADO: {prontidao['motivo']}")
         if prontidao.get("prontas"):
@@ -212,7 +213,10 @@ def main() -> None:
               " o que esconde as classes raras.")
 
     for tarefa in [argumentos.tarefa]:
-        prontidao = estado["prontidao"][tarefa]
+        # A prontidão das classes PEDIDAS, não a do catálogo inteiro. `estado`
+        # foi apurado sem `classes`: usá-lo aqui faria uma classe rara de fora
+        # do pedido pular um treino que `--classe` tinha acabado de liberar.
+        prontidao = prontidao_pedida[tarefa]
         print(f"\n=== {corpus.TAREFAS[tarefa]} ===")
         if not prontidao["pode_treinar"]:
             print(f"  pulada: {prontidao['motivo']}")
@@ -236,6 +240,7 @@ def main() -> None:
                 dispositivo=argumentos.dispositivo,
                 salvar_melhor=not argumentos.nao_salvar,
                 progresso=progresso,
+                semente=argumentos.semente,
             )
 
         for falha in resultado["falhas"]:

@@ -179,7 +179,17 @@ def _proposta_de(vitima: dict, existente: dict) -> dict:
             ]
             if not concretos:
                 continue
-            if sorted(novo) != sorted(existente.get(campo) or []):
+            # As derivadas ficam FORA da comparação. `chacina` é calculada da
+            # contagem de vítimas e a LLM nunca a devolve, então compará-la
+            # faria toda vítima que já a tem gerar uma proposta de removê-la —
+            # divergência inventada pela comparação, não afirmada pela LLM.
+            def _comparaveis(valores):
+                return sorted(
+                    v for v in (valores or [])
+                    if v not in vocabulario.CIRCUNSTANCIAS_DERIVADAS
+                )
+
+            if _comparaveis(novo) != _comparaveis(existente.get(campo)):
                 proposta[campo] = novo
             continue
         if novo in VAZIOS:
