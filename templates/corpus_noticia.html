@@ -7,113 +7,109 @@
     <p class="suave">
       Anotada por {{ noticia.anotador or '—' }} ·
       {{ noticia.atualizado_em[:16].replace('T', ' ') }}
-      {% if noticia.particao %} · partição <strong>{{ noticia.particao }}</strong>{% endif %}
-      {% if restantes %} · {{ restantes }} sem rótulo na fila{% endif %}
+      {% if noticia.particao %} · conjunto <strong>{{ noticia.particao }}</strong>{% endif %}
+      {% if restantes %} · {{ restantes }} na fila de anotação{% endif %}
     </p>
   </div>
   <a href="{{ url_for('corpus_repositorio') }}"><button class="secundario">Voltar ao corpus</button></a>
 </div>
 
+{% if not noticia.rotulada %}
+  <p class="aviso aviso-aviso">
+    Esta notícia ainda está na fila. Salvar já a tira de lá — inclusive se você
+    não marcar nenhum indicador, porque “nenhum se aplica” é um rótulo, não uma
+    pendência.
+  </p>
+{% endif %}
+
 <form method="post">
   <div class="cartao">
-    <h2>Etapa 1 — É violência armada?</h2>
+    <h2>Classes</h2>
     <p class="suave">
-      A premissa é única: a notícia relata <strong>disparo de arma de fogo</strong>.
-      Ameaça com arma sem tiro, apreensão de arma, facada ou agressão sem disparo
-      são <strong>não</strong>. Só o que passa aqui segue para a etapa 2.
-    </p>
-    <div class="linha escolha-grande">
-      <label class="caixa {{ 'escolhida' if noticia.violencia_armada == 1 }}">
-        <input type="radio" name="violencia_armada" value="sim" {% if noticia.violencia_armada == 1 %}checked{% endif %}>
-        <strong>Sim</strong> — houve disparo
-      </label>
-      <label class="caixa {{ 'escolhida' if noticia.violencia_armada == 0 }}">
-        <input type="radio" name="violencia_armada" value="nao" {% if noticia.violencia_armada == 0 %}checked{% endif %}>
-        <strong>Não</strong> — sem disparo
-      </label>
-      <label class="caixa {{ 'escolhida' if noticia.violencia_armada is none }}">
-        <input type="radio" name="violencia_armada" value="nao_rotulado" {% if noticia.violencia_armada is none %}checked{% endif %}>
-        Sem rótulo
-      </label>
-    </div>
-  </div>
-
-  <div class="cartao">
-    <h2>Etapa 2 — Classificação</h2>
-    <p class="suave">
-      Vale só para notícia positiva na etapa 1. Se você marcar "não" acima, estes
-      rótulos são descartados ao salvar: rotular a motivação de uma notícia que
-      não é violência armada contaminaria a segunda tarefa.
+      Marque todas as que o texto sustenta: uma notícia pode ter várias ao mesmo
+      tempo, e marcar nenhuma é uma resposta válida — é o exemplo negativo que
+      ensina o modelo a recusar notícia fora do escopo. Oito são
+      <strong>fenômenos</strong> da ocorrência; suicídio e LGBTQIAPN+ são
+      <strong>circunstâncias</strong> da vítima, e são elas que autorizam a LLM
+      a avaliá-las depois.
     </p>
 
-    <label for="motivo_principal">Motivação principal</label>
-    <select id="motivo_principal" name="motivo_principal">
-      <option value="">— não definida —</option>
-      {% for categoria in motivacoes %}
-        <option value="{{ categoria.nome }}" {% if noticia.motivo_principal == categoria.nome %}selected{% endif %}>
-          {{ categoria.nome }}
-        </option>
-      {% endfor %}
-    </select>
-
-    <details style="margin-top:8px">
-      <summary>Ver as definições das {{ motivacoes|length }} motivações</summary>
-      <table>
-        <thead><tr><th>Categoria</th><th>Definição</th><th>Não é</th></tr></thead>
-        <tbody>
-          {% for categoria in motivacoes %}
-          <tr>
-            <td><strong>{{ categoria.nome }}</strong></td>
-            <td class="suave">{{ categoria.definicao }}</td>
-            <td class="suave">{{ categoria.nao_e }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </details>
-
-    <label style="margin-top:14px">Indicadores de texto</label>
-    <div class="linha">
-      {% for indicador in indicadores_texto %}
-        <label class="caixa">
-          <input type="checkbox" name="indicadores" value="{{ indicador.nome }}"
-                 {% if indicador.nome in noticia.indicadores %}checked{% endif %}>
-          <strong>{{ indicador.rotulo }}</strong>
+    <div class="grade-indicadores">
+      {% for indicador in catalogo %}
+        <label class="caixa {{ 'escolhida' if indicador.nome in noticia.indicadores }}">
+          <span class="cabeca">
+            <input type="checkbox" name="indicadores" value="{{ indicador.nome }}"
+                   {% if indicador.nome in noticia.indicadores %}checked{% endif %}>
+            {{ indicador.rotulo }}
+            {% if indicador.classe == 'circunstancia' %}<span class="etiqueta">circunstância</span>{% endif %}
+          </span>
           <span class="suave">{{ indicador.definicao }}</span>
         </label>
       {% endfor %}
     </div>
+
+    <details style="margin-top:12px">
+      <summary>Ver a regra de anotação de cada indicador</summary>
+      <div class="rolagem">
+<table>
+        <thead><tr><th>Indicador</th><th>Quando marcar</th><th>Exemplos</th></tr></thead>
+        <tbody>
+          {% for indicador in catalogo %}
+          <tr>
+            <td><strong>{{ indicador.rotulo }}</strong><br><span class="suave">{{ indicador.nome }}</span></td>
+            <td class="suave">{{ indicador.skill }}</td>
+            <td class="suave">
+              <ul style="margin:0; padding-left:16px">
+                {% for e in indicador.exemplos %}<li>{{ e }}</li>{% endfor %}
+              </ul>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </details>
   </div>
 
   <div class="cartao">
     <h2>Fonte</h2>
-    <div class="linha">
-      <div style="flex:2">
-        <label for="link">Link</label>
-        <input id="link" name="link" value="{{ noticia.link or '' }}">
-      </div>
-      <div style="flex:2">
-        <label for="titulo">Título</label>
-        <input id="titulo" name="titulo" value="{{ noticia.titulo or '' }}">
-      </div>
-    </div>
+    <label for="link">Link</label>
+    <input id="link" name="link" value="{{ noticia.link or '' }}">
     {% if noticia.link %}
       <p><a href="{{ noticia.link }}" target="_blank" rel="noopener">Abrir a fonte original</a></p>
     {% endif %}
 
     <label for="texto" style="margin-top:10px">Texto</label>
     <textarea id="texto" name="texto" rows="14" required>{{ noticia.texto }}</textarea>
-
-    <label for="observacao" style="margin-top:10px">Observação do anotador</label>
-    <input id="observacao" name="observacao" value="{{ noticia.observacao or '' }}"
-           placeholder="Por que este rótulo, em caso de dúvida">
   </div>
 
   <div class="cartao">
-    <div class="linha">
+    <h2>Aprovação</h2>
+    <p class="suave">
+      Só o que está aprovado treina o classificador. Quem aprova é quem
+      <strong>revisa</strong>, não quem cadastra: um rótulo errado aqui não
+      aparece em tela nenhuma, só num modelo pior errando em notícia que
+      ninguém está olhando.
+      {% if noticia.aprovada and noticia.aprovada_por %}
+        Aprovada por <strong>{{ noticia.aprovada_por }}</strong>
+        em {{ noticia.aprovada_em }}.
+      {% endif %}
+    </p>
+    <label class="caixa {{ 'escolhida' if noticia.aprovada }}">
+      <span class="cabeca">
+        <input type="checkbox" name="aprovada" value="1"
+               {% if noticia.aprovada %}checked{% endif %}>
+        Aprovar este rótulo para o treino
+      </span>
+      <span class="suave">
+        Mudar os indicadores sem marcar esta caixa tira a notícia do treino
+        até alguém revisar — rótulo novo é afirmação nova.
+      </span>
+    </label>
+    <div class="linha" style="margin-top:12px">
       <button type="submit">Salvar rótulos</button>
       {% if restantes %}
-        <button type="submit" name="proxima" value="1" class="secundario">Salvar e ir para a próxima sem rótulo</button>
+        <button type="submit" name="proxima" value="1" class="secundario">Salvar e ir para a próxima da fila</button>
       {% endif %}
     </div>
   </div>

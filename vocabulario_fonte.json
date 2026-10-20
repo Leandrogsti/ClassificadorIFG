@@ -1,0 +1,4 @@
+{
+ "_leia_me": "Listas fechadas que o analista pode editar em /locais. Só o que DIFERE do padrão de fábrica é gravado: lista ausente aqui cai no valor definido em vocabulario.py, de modo que uma correção futura no padrão chegue a quem não personalizou. | O VALOR nunca muda depois de gravado no banco — ele é o que está nas ocorrências antigas; o RÓTULO pode ser reescrito à vontade, porque é só o que a pessoa lê.",
+ "listas": {}
+}

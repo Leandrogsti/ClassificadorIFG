@@ -1,58 +1,117 @@
 {% extends "base.html" %}
 
-{% macro campos_vitima(v, prefixo) %}
-  <div class="linha">
-    <div>
-      <label>Nome</label>
-      <input name="nome" value="{{ v.nome or '' }}" placeholder="sem nome">
-    </div>
-    <div>
-      <label>Idade</label>
-      <input name="idade" type="number" min="0" max="120" value="{{ v.idade if v.idade is not none else '' }}">
-    </div>
-    <div>
-      <label>Gênero</label>
-      <select name="genero">
-        {% for opcao in generos %}
-          <option value="{{ opcao }}" {% if v.genero == opcao %}selected{% endif %}>{{ opcao.replace('_', ' ') }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label>Tipo de vítima</label>
-      <select name="tipo_vitima">
-        {% for opcao in tipos_vitima %}
-          <option value="{{ opcao }}" {% if v.tipo_vitima == opcao %}selected{% endif %}>{{ opcao.replace('_', ' ') }}</option>
-        {% endfor %}
-      </select>
-    </div>
+{% macro selecao(nome, opcoes, atual, rotulo) %}
+  <label>{{ rotulo }}</label>
+  <select name="{{ nome }}">
+    {% for valor, texto in opcoes %}
+      <option value="{{ valor }}" {% if atual == valor %}selected{% endif %}>{{ texto }}</option>
+    {% endfor %}
+  </select>
+{% endmacro %}
+
+{% macro marcacoes(nome, opcoes, atuais, rotulo, ajuda='') %}
+  <label>{{ rotulo }}</label>
+  {% if ajuda %}<p class="suave" style="margin:0 0 6px">{{ ajuda }}</p>{% endif %}
+  <div class="grade-indicadores">
+    {% for valor, texto in opcoes %}
+      <label class="caixa {{ 'escolhida' if valor in atuais }}">
+        <span class="cabeca">
+          <input type="checkbox" name="{{ nome }}" value="{{ valor }}"
+                 {% if valor in atuais %}checked{% endif %}>
+          {{ texto }}
+        </span>
+      </label>
+    {% endfor %}
   </div>
-  <div class="linha" style="margin-top:10px">
-    <div>
-      <label>Situação</label>
-      <select name="situacao">
-        {% for opcao in situacoes %}
-          <option value="{{ opcao }}" {% if v.situacao == opcao %}selected{% endif %}>{{ opcao }}</option>
-        {% endfor %}
-      </select>
+{% endmacro %}
+
+{% macro campos_vitima(v) %}
+  {% set tipos = v.tipo_vitima or ['civil'] %}
+  {% set circ = v.circunstancias or ['nao_se_aplica'] %}
+  <div class="linha">
+    <div style="flex:2">
+      <label>Nome da vítima</label>
+      <input name="nome" value="{{ v.nome or '' }}" placeholder="deixe em branco se a notícia não informar">
     </div>
+    <div>{{ selecao('status', vocab.status_vitima, v.status, 'Status') }}</div>
     <div>
       <label>Data da morte</label>
       <input name="data_morte" type="date" value="{{ v.data_morte or '' }}">
     </div>
+  </div>
+
+  <div class="linha" style="margin-top:10px">
+    <div>{{ selecao('genero', vocab.generos, v.genero or 'nao_identificado', 'Gênero') }}</div>
+    <div>{{ selecao('cor_raca', vocab.cores_raca, v.cor_raca or 'nao_identificado', 'Cor/raça') }}</div>
+    <div>{{ selecao('grupo_etario', vocab.grupos_etarios, v.grupo_etario or 'nao_identificado', 'Grupo etário') }}</div>
     <div>
-      <label>Cargo / candidatura política</label>
-      <input name="cargo_politico" value="{{ v.cargo_politico or '' }}">
+      <label>Idade</label>
+      <input name="idade" type="number" min="0" max="200"
+             value="{{ v.idade if v.idade is not none else '' }}">
+    </div>
+    <div>{{ selecao('local', vocab.locais_vitima, v.local or 'nao_identificado', 'Local') }}</div>
+  </div>
+  <p class="suave">
+    Com idade em número, o grupo etário é recalculado a partir dela ao salvar.
+    Cor/raça só vem preenchida quando a notícia afirma — complete aqui, ou
+    deixe <strong>Não identificado</strong>.
+  </p>
+
+  <div style="margin-top:12px">
+    {{ marcacoes('tipo_vitima', vocab.tipos_vitima, tipos, 'Tipo de vítima',
+                 'Marcação múltipla: um policial que também é vereador é agente e político.') }}
+  </div>
+
+  <div style="margin-top:12px">
+    {{ marcacoes('circunstancias', vocab.circunstancias_editaveis, circ, 'Circunstância',
+                 '"Não se aplica" é descartado automaticamente se você marcar qualquer outra.') }}
+    {% set derivadas = circ | select('in', vocab.circunstancias_derivadas) | list %}
+    {% if derivadas %}
+      <p class="suave" style="margin:6px 0 0">
+        Calculada pelo sistema:
+        {% for c in derivadas %}
+          <strong>{{ rot.circunstancia.get(c, c) }}</strong>{{ ', ' if not loop.last }}
+        {% endfor %}
+        — sai da lista de vítimas, não se marca à mão. Para mudá-la, corrija o
+        status da vítima ou o status de serviço do agente.
+      </p>
+    {% endif %}
+  </div>
+
+  <div class="complementar" data-tipo="agente">
+    <h4>Vitimização policial</h4>
+    <div class="linha">
+      <div>{{ selecao('vitimizacao_policial_corporacao', vocab.corporacoes, (v.vitimizacao_policial or {}).corporacao or 'nao_identificado', 'Corporação') }}</div>
+      <div>{{ selecao('vitimizacao_policial_cargo', vocab.cargos_agente, (v.vitimizacao_policial or {}).cargo or 'nao_identificado', 'Cargo') }}</div>
+      <div>{{ selecao('vitimizacao_policial_status_agente', vocab.status_agente, (v.vitimizacao_policial or {}).status_agente or 'nao_identificado', 'Status do agente') }}</div>
+      <div>
+        <label>Unidade</label>
+        <input name="vitimizacao_policial_unidade" value="{{ (v.vitimizacao_policial or {}).unidade or '' }}"
+               placeholder="batalhão ou grupamento">
+      </div>
     </div>
   </div>
+
+  <div class="complementar" data-tipo="politico">
+    <h4>Político baleado</h4>
+    <div class="linha">
+      <div>
+        <label>Partido</label>
+        <select name="politico_baleado_partido">
+          {% for sigla in partidos %}
+            <option value="{{ sigla }}" {% if (v.politico_baleado or {}).partido == sigla %}selected{% endif %}>{{ sigla }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>{{ selecao('politico_baleado_cargo', vocab.cargos_politico, (v.politico_baleado or {}).cargo, 'Cargo') }}</div>
+      <div>{{ selecao('politico_baleado_status_politico', vocab.status_politico, (v.politico_baleado or {}).status_politico, 'Status do político') }}</div>
+    </div>
+  </div>
+
   <div class="linha" style="margin-top:10px">
     <div style="flex:2">
-      <label>Circunstância</label>
-      <select name="circunstancia">
-        {% for slug, rotulo in circunstancias %}
-          <option value="{{ slug }}" {% if v.circunstancia == slug %}selected{% endif %}>{{ rotulo }}</option>
-        {% endfor %}
-      </select>
+      <label>Descrição da vítima</label>
+      <input name="descricao" value="{{ v.descricao or '' }}" placeholder="observações individuais, se houver">
     </div>
     <div>
       <label>Fonte</label>
@@ -64,11 +123,15 @@
 {% block conteudo %}
 <div class="entre">
   <div>
-    <h1>Ocorrência #{{ ocorrencia.id }}</h1>
+    <h1>{{ ocorrencia.id_caso or 'Ocorrência #' ~ ocorrencia.id }}</h1>
     <p class="suave">
-      {{ ocorrencia.data_fato }} · {{ ocorrencia.cidade }} — {{ ocorrencia.bairro }}
-      {% if ocorrencia.localidade %} · {{ ocorrencia.localidade }}{% endif %}
-      · analista {{ ocorrencia.analista }} · cadastrada em {{ ocorrencia.criado_em[:16].replace('T', ' ') }}
+      {{ ocorrencia.data_caso }}
+      {% if ocorrencia.hora_caso %} às {{ ocorrencia.hora_caso }}{% endif %}
+      · {{ rot.faixa_horaria.get(ocorrencia.faixa_horaria, ocorrencia.faixa_horaria) }}
+      · {{ ocorrencia.cidade }}/{{ ocorrencia.estado }} — {{ ocorrencia.bairro }}
+      {% if ocorrencia.localidade and ocorrencia.localidade != 'nao_identificado' %} · {{ ocorrencia.localidade }}{% endif %}
+      · analista {{ ocorrencia.analista }}
+      · registrada em {{ ocorrencia.data_registro[:16].replace('T', ' ') }}
     </p>
   </div>
   <span class="status status-{{ ocorrencia.status }}">{{ rotulos_status.get(ocorrencia.status, ocorrencia.status) }}</span>
@@ -89,25 +152,91 @@
   <h2>Classificação</h2>
   <div class="linha">
     <div>
-      <label>Motivo principal</label>
-      <strong>{{ ocorrencia.motivo_principal or '—' }}</strong>
-    </div>
-    <div>
-      <label>Motivos complementares</label>
-      {% for m in ocorrencia.motivos_complementares %}<span class="etiqueta">{{ m }}</span>{% endfor %}
-      {% if not ocorrencia.motivos_complementares %}<span class="suave">nenhum</span>{% endif %}
+      <label>Vítimas baleadas?</label>
+      <strong>{{ 'Sim' if ocorrencia.vitimas_baleadas == 'S' else 'Não' }}</strong>
     </div>
   </div>
+
   <div style="margin-top:12px">
-    <label>Indicadores</label>
-    {% for i in ocorrencia.indicadores %}
-      <span class="etiqueta {{ 'texto' if i in ocorrencia.indicadores_texto else 'regra' }}">
-        {{ rotulos_indicadores.get(i, i) }}
+    <label>Fenômeno observado</label>
+    {% for i in ocorrencia.fenomenos %}
+      {% set de_onde = origem_fenomenos.get(i, 'texto') %}
+      <span class="etiqueta {{ 'regra' if de_onde == 'regra' else 'texto' }}"
+            title="{{ {'texto': 'classificado a partir do texto', 'regra': 'comprovado pela lista de vítimas', 'ambos': 'classificado no texto e confirmado pelas vítimas'}[de_onde] }}">
+        {{ rotulos_fenomeno.get(i, i) }}{% if de_onde == 'ambos' %} ✓{% endif %}
       </span>
     {% endfor %}
-    {% if not ocorrencia.indicadores %}<span class="suave">nenhum</span>{% endif %}
-    <p class="suave">Verde: calculado por regra sobre as vítimas. Roxo: classificado a partir do texto.</p>
+    {% if not ocorrencia.fenomenos %}<span class="suave">nenhum</span>{% endif %}
+    <p class="suave">
+      Roxo: classificado a partir do texto. Verde: não veio do texto, foi a lista
+      de vítimas que o comprovou. O ✓ marca os dois caminhos de acordo.
+    </p>
+    {% if ocorrencia.fenomenos_bert is not none %}
+      <p class="suave">
+        O BERT marcou:
+        {% for i in ocorrencia.fenomenos_bert %}<span class="etiqueta">{{ rotulos_fenomeno.get(i, i) }}</span>{% endfor %}
+        {% if not ocorrencia.fenomenos_bert %}nenhuma classe{% endif %}
+      </p>
+      <p class="suave">
+        Quem decide as classes é o BERT: a LLM não acrescenta nem remove nenhuma,
+        só aprofunda as que ele marcou.
+      </p>
+    {% endif %}
+
+    {% if ocorrencia.nao_sustentados %}
+      <p class="aviso aviso-aviso">
+        A LLM <strong>não achou base no texto</strong> para
+        {% for i in ocorrencia.nao_sustentados %}<strong>{{ rotulos_fenomeno.get(i, i) }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}.
+        A classe continua marcada, mas os campos dela ficaram
+        <strong>em branco de propósito</strong>, à sua espera — não foi falha da
+        chamada. Se o BERT errou, corrija em
+        <a href="{{ url_for('classificacoes') }}">classificações</a>: a correção
+        vira exemplo do próximo treino.
+      </p>
+    {% endif %}
+
+    {% if ocorrencia.sugeridos_pela_llm %}
+      <p class="aviso aviso-aviso">
+        A LLM tentou marcar
+        {% for i in ocorrencia.sugeridos_pela_llm %}<strong>{{ rotulos_fenomeno.get(i, i) }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
+        por conta própria, e o sistema <strong>recusou</strong> — quem classifica
+        é o BERT. Fica registrado porque é o melhor sinal de que o
+        classificador <strong>deixou passar</strong> essa classe: vale anotar
+        esta notícia no corpus.
+      </p>
+    {% endif %}
   </div>
+
+  {% if complementos.acao_policial %}
+    <div style="margin-top:12px">
+      <label>Ação policial</label>
+      <p>
+        <span class="etiqueta texto">{{ rot.contexto_acao.get(complementos.acao_policial.contexto, complementos.acao_policial.contexto) }}</span>
+        {% for c in complementos.acao_policial.corporacoes_presentes %}
+          <span class="etiqueta">{{ rot.corporacao.get(c, c) }}</span>
+        {% endfor %}
+      </p>
+      {% if complementos.acao_policial.unidades_presentes %}
+        <p class="suave">Unidades: {{ complementos.acao_policial.unidades_presentes }}</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if complementos.crime_organizado %}
+    <div style="margin-top:12px">
+      <label>Crime organizado</label>
+      <p>
+        {% for c in complementos.crime_organizado.contextos %}
+          <span class="etiqueta texto">{{ rot.contexto_crime.get(c, c) }}</span>
+        {% endfor %}
+      </p>
+      {% if complementos.crime_organizado.grupos_citados %}
+        <p class="suave">Grupos citados: {{ complementos.crime_organizado.grupos_citados | join(', ') }}</p>
+      {% else %}
+        <p class="suave">Nenhum grupo nomeado na notícia.</p>
+      {% endif %}
+    </div>
+  {% endif %}
 
   {% if ocorrencia.divergencias %}
     <div class="proposta">
@@ -120,8 +249,9 @@
 <div class="cartao">
   <h2>Inclusão de notícia</h2>
   <p class="suave">
-    Cole o link e o texto. A cada OK, todas as notícias desta ocorrência são
-    relidas juntas e a lista de vítimas é refeita do zero — nunca somada.
+    Cole o link e o texto. A cada OK, o BERT marca as classes, a LLM certifica
+    cada uma e todas as notícias desta ocorrência são relidas juntas — a lista
+    de vítimas é refeita do zero, nunca somada.
   </p>
   <form method="post" action="{{ url_for('adicionar_noticia', ocorrencia_id=ocorrencia.id) }}">
     <label for="link">Link</label>
@@ -164,7 +294,7 @@
   <h2>Verificação das vítimas ({{ vitimas|length }})</h2>
   <p class="suave">
     Confira e corrija o que for preciso. As correções são mantidas nos
-    processamentos seguintes, e cada alteração recalcula os indicadores.
+    processamentos seguintes, e cada alteração recalcula o fenômeno observado.
   </p>
 
   {% if not vitimas %}
@@ -176,7 +306,8 @@
       <div class="entre">
         <h3>
           {{ v.nome or 'Vítima sem nome' }}
-          <span class="etiqueta">{{ v.situacao }}</span>
+          <span class="suave">{{ v.id_vitima }}</span>
+          <span class="etiqueta">{{ rot.status_vitima.get(v.status, v.status) }}</span>
           {% if v.editado_manualmente %}<span class="etiqueta regra">corrigida pelo analista</span>{% endif %}
         </h3>
         <form method="post" action="{{ url_for('excluir_vitima', vitima_id=v.id) }}">
@@ -193,9 +324,14 @@
           <strong>A LLM propõe mudanças a partir das notícias:</strong>
           <ul>
             {% for campo, valor in v.proposta.items() %}
-              {% set novo = rotulos_circunstancia.get(valor, valor) if campo == 'circunstancia' else valor %}
-              {% set atual = rotulos_circunstancia.get(v[campo], v[campo]) if campo == 'circunstancia' else v[campo] %}
-              <li>{{ campo }}: <strong>{{ novo if novo is not none else 'vazio' }}</strong> (atual: {{ atual if atual is not none else 'vazio' }})</li>
+              <li>{{ campo }}:
+                <strong>{% if valor is string or valor is number %}{{ valor }}{% else %}{{ valor | join(', ') }}{% endif %}</strong>
+                (atual:
+                {%- set atual = v[campo] %}
+                {% if atual is none %} vazio
+                {%- elif atual is string or atual is number %} {{ atual }}
+                {%- else %} {{ atual | join(', ') }}{% endif %})
+              </li>
             {% endfor %}
           </ul>
           <form method="post" action="{{ url_for('resolver_proposta', vitima_id=v.id, acao='aceitar') }}" style="display:inline">
@@ -207,8 +343,9 @@
         </div>
       {% endif %}
 
-      <form method="post" action="{{ url_for('editar_vitima', vitima_id=v.id) }}" style="margin-top:10px">
-        {{ campos_vitima(v, 'v') }}
+      <form method="post" action="{{ url_for('editar_vitima', vitima_id=v.id) }}"
+            class="formulario-vitima" style="margin-top:10px">
+        {{ campos_vitima(v) }}
         <div class="linha" style="margin-top:10px">
           <div style="flex:2">
             <label>Fonte ou justificativa da alteração</label>
@@ -224,8 +361,9 @@
 
   <details>
     <summary>Incluir vítima manualmente</summary>
-    <form method="post" action="{{ url_for('criar_vitima', ocorrencia_id=ocorrencia.id) }}">
-      {{ campos_vitima({}, 'nova') }}
+    <form method="post" action="{{ url_for('criar_vitima', ocorrencia_id=ocorrencia.id) }}"
+          class="formulario-vitima">
+      {{ campos_vitima({}) }}
       <button type="submit" style="margin-top:10px">Incluir vítima</button>
     </form>
   </details>
@@ -236,8 +374,9 @@
     <div>
       <h2>Concluir</h2>
       <p class="suave">
-        Grava o registro com status "não aprovado", calcula os indicadores de
-        regra sobre a lista final e dispara a checagem de duplicidade.
+        Grava o registro com status "não aprovado", recalcula o fenômeno
+        observado sobre a lista final de vítimas e dispara a checagem de
+        duplicidade.
       </p>
     </div>
     <form method="post" action="{{ url_for('concluir', ocorrencia_id=ocorrencia.id) }}">
@@ -250,7 +389,8 @@
 <div class="cartao">
   <details>
     <summary>Histórico de alterações ({{ historico|length }})</summary>
-    <table>
+    <div class="rolagem">
+<table>
       <thead><tr><th>Quando</th><th>Campo</th><th>Antes</th><th>Depois</th><th>Quem</th><th>Fonte</th></tr></thead>
       <tbody>
         {% for h in historico %}
@@ -265,7 +405,29 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </details>
 </div>
 {% endif %}
+
+<script>
+  // As tabelas complementares só existem para quem tem o tipo correspondente.
+  // Mostrá-las sempre faria o analista preencher patente de civil; escondê-las
+  // no servidor exigiria recarregar a página a cada marcação.
+  document.querySelectorAll(".formulario-vitima").forEach((formulario) => {
+    const sincronizar = () => {
+      const marcados = new Set(
+        [...formulario.querySelectorAll('input[name="tipo_vitima"]:checked')]
+          .map((caixa) => caixa.value)
+      );
+      formulario.querySelectorAll(".complementar").forEach((bloco) => {
+        bloco.style.display = marcados.has(bloco.dataset.tipo) ? "block" : "none";
+      });
+    };
+    formulario
+      .querySelectorAll('input[name="tipo_vitima"]')
+      .forEach((caixa) => caixa.addEventListener("change", sincronizar));
+    sincronizar();
+  });
+</script>
 {% endblock %}

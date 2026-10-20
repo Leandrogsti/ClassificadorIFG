@@ -1,0 +1,82 @@
+{
+  "_leia_me": "Conjunto-ouro da EXTRAÇÃO: a ficha que a LLM deveria produzir para cada conjunto de notícias. É o que torna uma mudança de prompt mensurável em vez de impressão. Rode com `python avaliar_extracao.py`. Só os campos presentes em `esperado` são cobrados — deixe de fora o que não quiser medir. Acrescente casos sempre que encontrar um erro: o caso que te surpreendeu hoje é o que impede a regressão amanhã.",
+  "casos": [
+    {
+      "nome": "ilha-do-governador-abordagem",
+      "observacao": "Dois civis baleados durante abordagem policial. A polícia estava em ação no momento do disparo, então acao_policial se sustenta. Nenhum local fechado é afirmado: é rua.",
+      "noticias": [
+        {
+          "link": "https://g1.globo.com/rj/rio-de-janeiro/noticia/2026/09/02/moradora-e-mototaxista-sao-baleados-durante-tiroteio-na-ilha-do-governador.ghtml",
+          "texto": "Moradora e mototaxista são baleados durante tiroteio na Ilha do Governador\r\nMulher foi atingida no abdômen e homem levou um tiro no ombro; os dois foram levados conscientes para o Hospital Municipal Evandro Freire.\r\nPor Jhonny Marvin, TV Globo\r\n\r\n02/09/2026 22h32  Atualizado há um mês\r\n\r\nMoradora e mototaxista são baleados durante tiroteio na Ilha do Governador — Foto: Arquivo pessoal\r\nMoradora e mototaxista são baleados durante tiroteio na Ilha do Governador — Foto: Arquivo pessoal\r\n\r\n\r\nUma mulher e um mototaxista foram baleados durante uma perseguição policial na noite desta quarta-feira (2), na Ilha do Governador, na Zona Norte do Rio. A mulher foi atingida no abdômen e o homem levou um tiro no tórax. Os dois foram socorridos e levados para o Hospital Municipal Evandro Freire.\r\n\r\nSegundo a Polícia Militar, os disparos aconteceram durante uma tentativa de abordagem a um veículo que saía de um dos acessos à comunidade do Dendê. Os ocupantes atiraram contra os policiais e retornaram para dentro da comunidade.\r\n\r\nA perseguição ocorreu entre as ruas Tenente Cleto Campelo e Graná.\r\n\r\nMulher estava atrás de viatura\r\n\r\nDe acordo com a PM, a mulher estava atrás de uma viatura do Grupamento de Ações Táticas (GAT) quando os disparos foram feitos. Ela foi atingida na região do abdômen.\r\n\r\nO mototaxista estava nas proximidades, perto de um estabelecimento comercial, quando foi atingido no tórax.\r\n\r\nAs duas vítimas foram socorridas pelas equipes do GAT e levadas para o Hospital Municipal Evandro Freire. Segundo a corporação, a princípio, os dois estavam conscientes e sem gravidade aparente.\r\n\r\nA ocorrência ainda estava em andamento até a última atualização."
+        }
+      ],
+      "esperado": {
+        "fenomenos": [
+          "mulheres_baleadas",
+          "acao_policial"
+        ],
+        "vitimas": [
+          {
+            "nome": null,
+            "status": "ferida",
+            "genero": "mulher_cis",
+            "tipo_vitima": [
+              "civil"
+            ],
+            "local": "nao_identificado"
+          },
+          {
+            "nome": null,
+            "status": "ferida",
+            "genero": "homem_cis",
+            "tipo_vitima": [
+              "civil"
+            ],
+            "local": "nao_identificado"
+          }
+        ]
+      }
+    },
+    {
+      "nome": "vaz-lobo-sargento-de-folga",
+      "observacao": "Policial executado DE FOLGA: não é ação policial, é vitimização policial. O nome só aparece na terceira notícia e a idade também; as duas primeiras dizem que não houve identificação, e isso não pode cancelar o que a terceira traz.",
+      "noticias": [
+        {
+          "link": "https://g1.globo.com/rj/rio-de-janeiro/noticia/2026/08/08/homem-e-morto-em-vaz-lobo.ghtml",
+          "texto": "Policial militar é assassinado a tiros em Vaz Lobo, na Zona Norte do Rio\r\nAgente do 41º BPM (Irajá) foi baleado na Rua Marambaia; equipes da Polícia Militar foram mobilizadas para a ocorrência. Ainda não há detalhes sobre o crime.\r\nPor g1 Rio\r\n\r\n08/08/2026 11h14  Atualizado há um mês\r\n\r\nPM é morto em Vaz Lobo — Foto: Reprodução\r\nPM é morto em Vaz Lobo — Foto: Reprodução\r\n\r\n\r\nUm policial militar do 41º BPM (Irajá) foi executado a tiros na Rua Marambaia, em Vaz Lobo, na Zona Norte do Rio, na manhã deste sábado (8).\r\n\r\nDe acordo com a PM, o sargento estava de folga quando homens armados se aproximaram e atiraram contra ele. Ele morreu na hora.\r\n\r\n📱Baixe o app do g1 para ver notícias do RJ em tempo real e de graça\r\n\r\nPoliciais militares foram acionados e isolaram a área. Ainda não há informações sobre a identidade do policial, a motivação do crime ou as circunstâncias do ataque.\r\n\r\nO caso será investigado pela Polícia Civil. Até a última atualização desta reportagem, ninguém havia sido preso.\r\n\r\n\r\nDe acordo com dados da PM, com mais essa morte, sobe para 29 o número de agentes da instituição vítimas da violência em 2026 no estado. Destes, 19 estavam de folga, 6 de serviço e 4 eram inativos.\r\n\r\nEm atualização\r\n\r\nAgora no g1\r\nAgora no g1\r\n\r\n🟩O g1 Rio está no GloboPop, o novo aplicativo de vídeos curtos verticais da Globo, disponível gratuitamente no seu celular. Lá no app, você pode seguir o palco do g1 Rio para não perder nenhum episódio. Baixe o GloboPop."
+        },
+        {
+          "link": "https://www.tupi.fm/rio/policial-militar-e-executado-em-vaz-lobo-na-zona-norte-do-rio/#google_vignette",
+          "texto": "Policial militar é executado em Vaz Lobo, na Zona Norte do RioSargento estava de folga em Vaz Lobo quando foi atacado; dados revelam que a maioria dos policiais mortos este ano não estava em serviço\r\n\r\nPublicado em 08/08/26 12:22Por Joubert Júnior\r\nCompartilhe\r\nCompartilhe no Facebook\r\nCompartilhe no X\r\nCompartilhe no Whatsapp\r\nCompartilhe no Telegram\r\ngoogle-news-logo\r\nHomens da polícia e bombeiros em uma rua, com motocicletas e um corpo no chãox\r\n\r\nAgentes de segurança no local onde um sargento da PM foi assassinado na Zona Norte do Rio. Foto: Reprodução\r\nUm sargento da Polícia Militar lotado no 41º BPM (Irajá) foi executado a tiros na manhã deste sábado (8) na Rua Marambaia, em Vaz Lobo, na Zona Norte do Rio.\r\n\r\nFique por dentro das notícias que importam para você!\r\nSiga a Super Rádio Tupi no Google Discovery\r\n\r\nDe acordo com a PM, o policial estava de folga quando homens armados se aproximaram e atiraram contra ele. O agente morreu no local.\r\n\r\n\r\n\r\nPoliciais militares foram acionados para isolar a área. O caso será investigado pela Polícia Civil e, até a última atualização, ninguém havia sido preso. Ainda não há informações sobre a identidade do sargento, a motivação ou as circunstâncias do ataque.\r\n\r\nCom mais essa morte, sobe para 29 o número de agentes da corporação vítimas da violência no estado do Rio em 2026. Os dados da própria PM revelam que a maioria não estava em serviço."
+        },
+        {
+          "link": "https://www.instagram.com/p/DbyLsAPEbpZ/",
+          "texto": "NO DIA DO ANIVERSÁRIO 🖤 O sargento Pacheco, do 41º BPM (Irajá), foi m0rto a tir0s na manhã deste sábado (8), na Rua Marambaia, em Vaz Lobo, na Zona Norte do Rio.\r\n\r\nSegundo informações da Polícia Militar, o agente estava de folga no dia que completou 45 anos, quando homens armados se aproximaram e efetuaram diversos disparos. Pacheco não resistiu aos ferimentos e morreu no local.\r\n\r\nA área foi isolada por policiais militares, e as circunstâncias e a motivação do crime ainda são investigadas pela Polícia Civil. Até o momento, não há informações sobre prisões.\r\n\r\n🖤 Mais um policial perde a vida de forma trágica, deixando familiares, amigos e companheiros de farda em luto.\r\n\r\nCom a morte de Pacheco, 29 agentes da PM foram vítimas da violência no estado em 2026, segundo dados da corporação."
+        }
+      ],
+      "esperado": {
+        "fenomenos": [
+          "vitimizacao_policial"
+        ],
+        "vitimas": [
+          {
+            "nome": "Pacheco",
+            "status": "morta",
+            "genero": "homem_cis",
+            "idade": 45,
+            "grupo_etario": "adulto",
+            "tipo_vitima": [
+              "agente"
+            ],
+            "local": "nao_identificado",
+            "vitimizacao_policial": {
+              "corporacao": "policia_militar",
+              "cargo": "sargento",
+              "status_agente": "fora_de_servico"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

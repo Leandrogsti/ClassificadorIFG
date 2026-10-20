@@ -6,7 +6,7 @@
     <h1>Vítimas</h1>
     <p class="suave">
       {{ total }} vítima(s){% if total %} · página {{ pagina }} de {{ paginas }}{% endif %}.
-      Todas as pessoas atingidas, com a circunstância e o local da ocorrência.
+      Todas as pessoas atingidas, com perfil, circunstância e o local da ocorrência.
     </p>
   </div>
   <a href="{{ url_for('exportar_vitimas', **filtros_ativos) }}">
@@ -15,10 +15,26 @@
 </div>
 
 <div class="cartao">
+  <div class="linha abas">
+    <a href="{{ url_for('vitimas') }}" class="aba {{ 'ativa' if not em_acompanhamento }}">Todas</a>
+    <a href="{{ url_for('vitimas', acompanhamento=1) }}" class="aba {{ 'ativa' if em_acompanhamento }}">
+      Acompanhamento de feridos
+    </a>
+  </div>
+  {% if em_acompanhamento %}
+    <p class="suave">
+      Feridos dos últimos {{ dias_acompanhamento }} dias. A situação pode mudar
+      semanas depois do fato, e é aqui que se corrige o status de quem morreu
+      mais tarde. Passado o prazo, a edição continua possível — basta buscar
+      por data fora da janela.
+    </p>
+  {% endif %}
+
   <form method="get">
+    {% if em_acompanhamento %}<input type="hidden" name="acompanhamento" value="1">{% endif %}
     <div class="linha">
       <div>
-        <label for="de">Data do fato — de</label>
+        <label for="de">Data do caso — de</label>
         <input type="date" id="de" name="de" value="{{ filtros.de }}">
       </div>
       <div>
@@ -29,9 +45,10 @@
         <label for="cidade">Cidade</label>
         <select id="cidade" name="cidade">
           <option value="">Todas</option>
-          {% for nome in locais %}
+          {%- for nome in locais %}
             <option value="{{ nome }}" {% if filtros.cidade == nome %}selected{% endif %}>{{ nome }}</option>
-          {% endfor %}
+          {%- endfor %}
+          {%- if not locais %}<option value="" disabled>Nenhuma vítima registrada ainda</option>{% endif %}
         </select>
       </div>
       <div>
@@ -43,35 +60,73 @@
           {% endfor %}
         </select>
       </div>
+      <div>
+        <label for="localidade">Localidade</label>
+        <input id="localidade" name="localidade" value="{{ filtros.localidade }}" placeholder="Rua, comunidade...">
+      </div>
     </div>
 
     <div class="linha" style="margin-top:12px">
       <div>
-        <label for="localidade">Localidade</label>
-        <input id="localidade" name="localidade" value="{{ filtros.localidade }}" placeholder="Rua, comunidade...">
+        <label for="status">Status</label>
+        <select id="status" name="status" {% if em_acompanhamento %}disabled{% endif %}>
+          <option value="">Todos</option>
+          {% for valor, rotulo in vocab.status_vitima %}
+            <option value="{{ valor }}" {% if filtros.status == valor %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="genero">Gênero</label>
+        <select id="genero" name="genero">
+          <option value="">Todos</option>
+          {% for valor, rotulo in vocab.generos %}
+            <option value="{{ valor }}" {% if filtros.genero == valor %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="cor_raca">Cor/raça</label>
+        <select id="cor_raca" name="cor_raca">
+          <option value="">Todas</option>
+          {% for valor, rotulo in vocab.cores_raca %}
+            <option value="{{ valor }}" {% if filtros.cor_raca == valor %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="grupo_etario">Grupo etário</label>
+        <select id="grupo_etario" name="grupo_etario">
+          <option value="">Todos</option>
+          {% for valor, rotulo in vocab.grupos_etarios %}
+            <option value="{{ valor }}" {% if filtros.grupo_etario == valor %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="tipo_vitima">Tipo</label>
+        <select id="tipo_vitima" name="tipo_vitima">
+          <option value="">Todos</option>
+          {% for valor, rotulo in vocab.tipos_vitima %}
+            <option value="{{ valor }}" {% if filtros.tipo_vitima == valor %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div>
         <label for="circunstancia">Circunstância</label>
         <select id="circunstancia" name="circunstancia">
           <option value="">Todas</option>
-          {% for slug, rotulo in circunstancias %}
-            <option value="{{ slug }}" {% if filtros.circunstancia == slug %}selected{% endif %}>{{ rotulo }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label for="situacao">Situação</label>
-        <select id="situacao" name="situacao">
-          <option value="">Todas</option>
-          {% for opcao in situacoes %}
-            <option value="{{ opcao }}" {% if filtros.situacao == opcao %}selected{% endif %}>{{ opcao }}</option>
+          {% for valor, rotulo in vocab.circunstancias %}
+            <option value="{{ valor }}" {% if filtros.circunstancia == valor %}selected{% endif %}>{{ rotulo }}</option>
           {% endfor %}
         </select>
       </div>
       <div style="align-self:end" class="linha">
-        <button type="submit">Buscar</button>
+        <button type="submit" class="secundario">Buscar</button>
         {% if filtros_ativos %}
-          <a href="{{ url_for('vitimas') }}"><button class="secundario" type="button">Limpar</button></a>
+          <a href="{{ url_for('vitimas', acompanhamento=1 if em_acompanhamento else None) }}">
+            <button class="secundario" type="button">Limpar</button>
+          </a>
         {% endif %}
       </div>
     </div>
@@ -82,35 +137,87 @@
   {% if not vitimas %}
     <p class="suave">Nenhuma vítima encontrada com esses filtros.</p>
   {% else %}
+  <p class="suave">
+    <strong>Cor/raça</strong> e <strong>status</strong> são editáveis direto na
+    tabela: a imprensa quase nunca informa cor/raça, e quando o analista não
+    encontra a informação a resposta correta é <em>Não identificado</em> — não
+    deixar em branco. Salvar aqui grava no histórico e devolve a ocorrência
+    para aprovação.
+  </p>
   <div style="overflow-x:auto">
-    <table>
+    <div class="rolagem">
+<table>
       <thead>
         <tr>
-          <th>Ocorrência</th><th>Data do fato</th><th>Local</th><th>Nome</th>
-          <th>Idade</th><th>Gênero</th><th>Tipo</th><th>Situação</th>
-          <th>Data da morte</th><th>Circunstância</th>
+          <th>ID_VÍTIMA</th><th>Caso</th><th>Data</th><th>Local</th><th>Nome</th>
+          <th>Idade</th><th>Grupo</th><th>Gênero</th><th>Tipo</th>
+          <th>Circunstância</th><th style="min-width:330px">Cor/raça e status</th>
         </tr>
       </thead>
       <tbody>
         {% for v in vitimas %}
         <tr>
-          <td><a href="{{ url_for('ocorrencia', ocorrencia_id=v.ocorrencia_id) }}">#{{ v.ocorrencia_id }}</a></td>
-          <td>{{ v.data_fato }}</td>
+          <td class="suave">{{ v.id_vitima }}</td>
+          <td><a href="{{ url_for('ocorrencia', ocorrencia_id=v.ocorrencia_id) }}">{{ v.id_caso }}</a></td>
+          <td>{{ v.data_caso }}</td>
           <td>
-            {{ v.cidade }} — {{ v.bairro }}
-            {% if v.localidade %}<br><span class="suave">{{ v.localidade }}</span>{% endif %}
+            {{ v.cidade }}/{{ v.estado }} — {{ v.bairro }}
+            {% if v.localidade and v.localidade != 'nao_identificado' %}
+              <br><span class="suave">{{ v.localidade }}</span>
+            {% endif %}
           </td>
-          <td>{{ v.nome or 'sem nome' }}</td>
+          <td>
+            {{ v.nome or 'sem nome' }}
+            {% if v.vitimizacao_policial %}
+              <br><span class="suave">{{ rot.corporacao.get(v.vitimizacao_policial.corporacao) }}
+              · {{ rot.cargo_agente.get(v.vitimizacao_policial.cargo) }}</span>
+            {% endif %}
+            {% if v.politico_baleado %}
+              <br><span class="suave">{{ v.politico_baleado.partido }}
+              · {{ rot.cargo_politico.get(v.politico_baleado.cargo, '—') }}</span>
+            {% endif %}
+          </td>
           <td>{{ v.idade if v.idade is not none else '—' }}</td>
-          <td>{{ v.genero.replace('_', ' ') }}</td>
-          <td>{{ v.tipo_vitima.replace('_', ' ') }}</td>
-          <td><span class="etiqueta">{{ v.situacao }}</span></td>
-          <td>{{ v.data_morte or '—' }}</td>
-          <td>{{ rotulos_circunstancia.get(v.circunstancia, '—') }}</td>
+          <td>{{ rot.grupo_etario.get(v.grupo_etario, '—') }}</td>
+          <td>{{ rot.genero.get(v.genero, '—') }}</td>
+          <td>
+            {% for t in v.tipo_vitima %}<span class="etiqueta">{{ rot.tipo_vitima.get(t, t) }}</span>{% endfor %}
+          </td>
+          <td>
+            {% for c in v.circunstancias %}
+              <span class="etiqueta {{ 'texto' if c != 'nao_se_aplica' }}">{{ rot.circunstancia.get(c, c) }}</span>
+            {% endfor %}
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('editar_vitima_rapida', vitima_id=v.id) }}"
+                  class="linha" style="gap:6px; align-items:end">
+              <div style="min-width:120px">
+                <select name="cor_raca">
+                  {% for valor, rotulo in vocab.cores_raca %}
+                    <option value="{{ valor }}" {% if v.cor_raca == valor %}selected{% endif %}>{{ rotulo }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div style="min-width:90px">
+                <select name="status">
+                  {% for valor, rotulo in vocab.status_vitima %}
+                    <option value="{{ valor }}" {% if v.status == valor %}selected{% endif %}>{{ rotulo }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div style="min-width:120px">
+                <input name="data_morte" type="date" value="{{ v.data_morte or '' }}">
+              </div>
+              <div style="flex:0">
+                <button type="submit" class="secundario">Salvar</button>
+              </div>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   {% endif %}
 </div>

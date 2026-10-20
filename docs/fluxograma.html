@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluxograma do classificador</title>
+<style>
+  :root {
+    --fundo: #fbfbfd; --texto: #1c2430; --suave: #5c6878;
+    --borda: #dfe4ec; --cartao: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #14181e; --texto: #e6eaf0; --suave: #9aa6b5;
+      --borda: #2b323c; --cartao: #1b2027;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 16px 80px; background: var(--fundo);
+    color: var(--texto); font: 16px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 4px; }
+  h2 {
+    font-size: 1.3rem; margin: 44px 0 12px; padding-top: 18px;
+    border-top: 1px solid var(--borda);
+  }
+  h3 { font-size: 1.05rem; margin: 28px 0 8px; }
+  p, li { color: var(--texto); }
+  code {
+    background: var(--cartao); border: 1px solid var(--borda);
+    border-radius: 4px; padding: 1px 5px; font-size: 0.88em;
+  }
+  .diagrama {
+    background: var(--cartao); border: 1px solid var(--borda);
+    border-radius: 10px; padding: 18px; margin: 18px 0; overflow-x: auto;
+  }
+  .diagrama svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  .aviso {
+    background: var(--cartao); border: 1px solid var(--borda);
+    border-left: 3px solid #b0561a; border-radius: 6px;
+    padding: 10px 14px; color: var(--suave); font-size: 0.92rem;
+  }
+  hr { display: none; }
+  @media print {
+    body { padding: 0; }
+    h2 { page-break-before: always; border-top: 0; }
+    .diagrama { page-break-inside: avoid; border-color: #ccc; }
+    .aviso { display: none; }
+  }
+</style>
+<main>
+<p class="aviso">
+  Gerado de <code>fluxograma.md</code>. Para salvar um diagrama como imagem, clique
+  nele com o botão direito e escolha salvar, ou use Ctrl&nbsp;+&nbsp;P para PDF.
+</p>
+<h1>Fluxograma do classificador</h1>
+<p>Fonte em Mermaid dos diagramas do fluxo. Renderiza direto no GitHub e na pré-visualização de Markdown do VS Code; para exportar imagem, use <a href="https://mermaid.live">https://mermaid.live</a>.</p>
+<p>Mantenha este arquivo junto do código: um fluxograma que descreve uma versão antiga do fluxo é pior que nenhum.</p>
+<h2>1. O caminho de uma notícia</h2>
+<p>A notícia chega <strong>antes</strong> de existir ocorrência. Quem olha primeiro é o classificador, e é a marcação dele que decide se vale abrir registro — por isso a abertura da ocorrência aparece no meio do caminho, não no começo.</p>
+<div class="diagrama"><pre class="mermaid">flowchart TD
+    A[&quot;1 · Notícia recebida&lt;br/&gt;&lt;small&gt;link, data e texto, em /recebidas&lt;/small&gt;&quot;]
+    DUP{&quot;texto repetido?&quot;}
+    PRE2[&quot;2 · Limpeza&lt;br/&gt;&lt;small&gt;tira ruído de portal e desofusca&lt;/small&gt;&quot;]
+    B[&quot;3 · BERT&lt;br/&gt;&lt;small&gt;marca 8 classes, multirrótulo&lt;/small&gt;&quot;]
+    BD[(&quot;recebida&lt;br/&gt;&lt;small&gt;texto · indicadores · votos de cada classe&lt;/small&gt;&quot;)]
+    T{&quot;3 · Triagem&lt;br/&gt;pela concordância&quot;}
+    ARQ[&quot;arquivo&lt;br/&gt;&lt;small&gt;0 voto em tudo: acervo&lt;/small&gt;&quot;]
+    AL[&quot;alerta&lt;br/&gt;&lt;small&gt;abaixo do corte: pessoa verifica&lt;/small&gt;&quot;]
+    FILA[&quot;na fila&lt;br/&gt;&lt;small&gt;sem modelo treinado ainda&lt;/small&gt;&quot;]
+    OC[&quot;5 · Ocorrência aberta&lt;br/&gt;&lt;small&gt;estado, cidade, bairro&lt;/small&gt;&quot;]
+    E[&quot;6 · LLM&lt;br/&gt;&lt;small&gt;aprofunda dentro das classes marcadas&lt;/small&gt;&quot;]
+    F[&quot;7 · Regras sobre as vítimas&lt;br/&gt;&lt;small&gt;chacina, contagem, idade&lt;/small&gt;&quot;]
+    G[&quot;8 · Conferência do analista&lt;br/&gt;&lt;small&gt;correção manual prevalece&lt;/small&gt;&quot;]
+    H[&quot;9 · Concluir e aprovar&lt;br/&gt;&lt;small&gt;o sênior revisa o júnior&lt;/small&gt;&quot;]
+    CP[(&quot;corpus&lt;br/&gt;&lt;small&gt;aprovado = treina&lt;/small&gt;&quot;)]
+
+    A --&gt; DUP
+    DUP -- &quot;sim&quot; --&gt; BD
+    DUP -- &quot;não&quot; --&gt; PRE2 --&gt; B
+    B -. &quot;grava a marcação&lt;br/&gt;antes de qualquer decisão&quot; .-&gt; BD
+    B --&gt; T
+    T -- &quot;0 voto&quot; --&gt; ARQ
+    T -- &quot;1 de 3&quot; --&gt; AL
+    T -- &quot;2 de 3 ou mais&quot; --&gt; OC
+    B -. &quot;marcar devolve None&quot; .-&gt; FILA
+    ARQ -- &quot;modelo ou indicador novo:&lt;br/&gt;Reavaliar o arquivo&quot; --&gt; PRE2
+    AL -- &quot;pessoa confirma&quot; --&gt; OC
+    FILA -- &quot;pessoa rotula&quot; --&gt; OC
+    OC -- &quot;o MESMO texto limpo,&lt;br/&gt;só os blocos das classes marcadas&quot; --&gt; E
+    E --&gt; F --&gt; G --&gt; H
+    G -- &quot;alterou uma vítima&quot; --&gt; F
+    H -- &quot;cada notícia da ocorrência,&lt;br/&gt;com os fenômenos confirmados&quot; --&gt; CP
+
+    classDef modelo fill:#e4edf8,stroke:#1f5fa8,stroke-width:2px;
+    classDef regra fill:#e2f0e8,stroke:#1a7040;
+    classDef banco fill:#fff,stroke:#b6bfcd,stroke-dasharray:5 4;
+    classDef frio fill:#eef0f3,stroke:#6b7584;
+    classDef aviso fill:#fdf1e3,stroke:#b0561a;
+    class B,E modelo;
+    class F,PRE2 regra;
+    class BD,CP banco;
+    class ARQ frio;
+    class AL,FILA aviso;</pre></div>
+<p><strong>Por que o arquivo existe.</strong> O escopo do sistema é o catálogo de indicadores, não todo tiroteio. Homem adulto baleado num assalto não sustenta nenhuma das oito classes: mandá-lo à LLM gastaria a chamada para receber &quot;nada se aplica&quot; de volta. Ele vai para o acervo, não conta como pendência, e volta a ser lido quando houver modelo novo ou indicador novo.</p>
+<p><strong>Por que a limpeza vem ANTES do BERT, e é a mesma para os dois.</strong> O BERT e a LLM leem o mesmo texto limpo, e isso é o que os faz concordar por construção. Antes o BERT lia o texto cru e a LLM lia o podado: a triagem prometia &quot;duas classes marcadas&quot; a partir de um texto e o portão do prompt era decidido de novo a partir de outro, divergência que não aparecia em tela nenhuma.</p>
+<p><strong>O critério da poda é invertido de propósito.</strong> Uma linha só sai quando casa com um padrão de ruído de portal E não carrega nenhum marcador de fato — nem palavra do domínio, nem idade, nem contagem de pessoas, nem horário. A versão anterior fazia o contrário, mantinha o que parecia relevante, e por isso apagava fato: saíram &quot;Mulher estava atrás de viatura&quot; e &quot;os dois estavam conscientes e sem gravidade aparente&quot;. Deixar lixo passar custa ~40 tokens; deixar fato sair custa uma classificação errada. Com o critério invertido, o erro cai sempre para o lado barato — e por isso a poda pôde ser LIGADA, depois de meses desligada.</p>
+<p><strong>A limpeza também desofusca.</strong> <code>m0rto a tir0s</code>, que é como as redes sociais escrevem para furar moderação automática, volta a ser <code>morto a tiros</code>. A troca de dígito por letra só acontece quando a palavra mistura letra e dígito E o resultado é um termo do domínio: <code>45 anos</code> e <code>41º BPM</code> não têm letra junto do dígito e nunca são tocados, porque idade adulterada seria pior que a ofuscação.</p>
+<p>Medido nas cinco notícias do banco: <strong>-19,8% de caracteres, 381 tokens</strong>, com os doze fatos materiais da lista de regressão intactos.</p>
+<h2>2. Quem decide cada fenômeno</h2>
+<p>Duas perguntas separadas: <strong>onde o resultado vai</strong> (fenômeno da ocorrência ou circunstância da vítima) e <strong>quem decide</strong>.</p>
+<div class="diagrama"><pre class="mermaid">flowchart TD
+    TX[&quot;Texto da notícia&quot;]
+    LV[&quot;Lista de vítimas&quot;]
+
+    BERT[&quot;BERT · 8 classes&quot;]
+    LLM[&quot;LLM · 1 fenômeno&quot;]
+    REG[&quot;Regra · 1 fenômeno&quot;]
+
+    TX --&gt; BERT
+    TX --&gt; LLM
+    LV --&gt; REG
+
+    BERT --&gt; B1[&quot;crianca_adolescente_baleado&quot;]
+    BERT --&gt; B2[&quot;mulheres_baleadas&quot;]
+    BERT --&gt; B3[&quot;acao_policial&quot;]
+    BERT --&gt; B4[&quot;vitimizacao_policial&quot;]
+    BERT --&gt; B5[&quot;crime_organizado&quot;]
+    BERT --&gt; B6[&quot;politico_baleado&quot;]
+    BERT --&gt; B7[&quot;suicidio&lt;br/&gt;&lt;small&gt;vai para a vítima&lt;/small&gt;&quot;]
+    BERT --&gt; B8[&quot;lgbtqiapn&lt;br/&gt;&lt;small&gt;vai para a vítima&lt;/small&gt;&quot;]
+
+    LLM --&gt; L1[&quot;violencia_genero&lt;br/&gt;&lt;small&gt;avaliado dentro dos blocos de&lt;br/&gt;mulheres_baleadas e lgbtqiapn&lt;/small&gt;&quot;]
+
+    REG --&gt; R1[&quot;chacina&lt;br/&gt;&lt;small&gt;3+ mortos, menos o agente&lt;br/&gt;que estava em serviço&lt;/small&gt;&quot;]
+
+    classDef modelo fill:#e4edf8,stroke:#1f5fa8,stroke-width:2px;
+    classDef llm fill:#fbeedf,stroke:#b0561a,stroke-width:2px;
+    classDef regra fill:#e2f0e8,stroke:#1a7040,stroke-width:2px;
+    class BERT modelo;
+    class LLM llm;
+    class REG regra;</pre></div>
+<p><strong>Chacina é derivada, não pedida — o fenômeno E a circunstância.</strong> A conta é: <strong>conta quem morreu, menos o agente de segurança que estava em serviço.</strong> Três civis mortos é chacina. Dois civis mais um agente morto é chacina dos três se o agente estava de folga, aposentado ou sem status informado; se ele estava em serviço, fica fora da contagem e sobram dois — e aí não há chacina.</p>
+<p>O agente em serviço sai porque numa ação policial ele está do outro lado do mesmo fato: se ele é baleado e mata três pessoas, a chacina é das três. De folga, ele é uma pessoa como as outras e conta.</p>
+<p>A circunstância de cada vítima sai da MESMA conta que o fenômeno, e é isso que impede um fenômeno que nenhuma vítima sustenta, ou uma chacina marcada em duas. A LLM não a marca: só preenche o <code>status</code> da vítima e o <code>status_agente</code> do agente, que é de onde a conta sai. A marcação também SAI sozinha — quando um morto se revela ferido, ou o status de serviço é corrigido, ela desaparece de todas as vítimas. Marcação derivada que só sabe entrar vira sujeira permanente.</p>
+<p><strong>Vitimização policial é das duas coisas.</strong> Tem classe de BERT *e* regra sobre a lista de vítimas. A regra sozinha não bastava: ela roda <strong>depois</strong> da LLM, e o portão que decide se a LLM é chamada acontece <strong>antes</strong>. Policial baleado de folga — que não é ação policial — não disparava classe nenhuma e ia para o arquivo em silêncio. Vale como regra geral: <strong>indicador que só existe como regra não pode controlar o portão da LLM.</strong></p>
+<h2>3. A marcação autoriza</h2>
+<p>Quatro circunstâncias dependem de uma classe marcada. Outras quatro — <code>bala_perdida</code>, <code>trajeto_escolar</code>, <code>acidente</code>, <code>tribunal_do_crime</code> — estão sempre disponíveis: reconhecê-las na leitura não depende de uma classe própria. E <code>chacina</code> não é oferecida à LLM em caso nenhum: o sistema a calcula.</p>
+<div class="diagrama"><pre class="mermaid">flowchart LR
+    M{&quot;O BERT marcou&lt;br/&gt;a classe?&quot;}
+    M -- &quot;mulheres_baleadas&quot; --&gt; F[&quot;a LLM avalia&lt;br/&gt;feminicidio_tentativa&lt;br/&gt;e agente_seguranca_agressor&quot;]
+    M -- &quot;lgbtqiapn&quot; --&gt; G[&quot;a LLM avalia&lt;br/&gt;a circunstância lgbtqiapn&quot;]
+    M -- &quot;suicidio&quot; --&gt; S[&quot;a LLM avalia&lt;br/&gt;a circunstância suicidio&quot;]
+    M -- &quot;não marcou&quot; --&gt; N[&quot;a instrução nem viaja no prompt;&lt;br/&gt;se a LLM devolver assim mesmo,&lt;br/&gt;a validação descarta&quot;]
+
+    classDef nao fill:#fbe9e8,stroke:#b3261e;
+    class N nao;</pre></div>
+<p>Sem modelo treinado — que é o estado de hoje — <code>marcados</code> chega como <code>None</code> e todas ficam liberadas: não há marcação para condicionar nada.</p>
+<h2>4. O ciclo que faz o modelo melhorar</h2>
+<div class="diagrama"><pre class="mermaid">flowchart LR
+    A[&quot;BERT marca&quot;] --&gt; B[(&quot;recebida&lt;br/&gt;&lt;small&gt;votos de cada classe&lt;/small&gt;&quot;)]
+    B --&gt; C[&quot;Júnior decide&lt;br/&gt;&lt;small&gt;rotula na fila, cadastra a ocorrência&lt;/small&gt;&quot;]
+    C --&gt; D[(&quot;corpus&lt;br/&gt;&lt;small&gt;rotulada, SEM aprovação&lt;/small&gt;&quot;)]
+    D --&gt; R{&quot;Sênior&lt;br/&gt;revisou?&quot;}
+    R -- &quot;não&quot; --&gt; D
+    R -- &quot;sim: aprovada&quot; --&gt; M{&quot;30 positivos&lt;br/&gt;de cada classe?&quot;}
+    M -- &quot;não&quot; --&gt; D
+    M -- &quot;sim&quot; --&gt; E[&quot;Treino&lt;br/&gt;&lt;small&gt;novo modelo, em /modelos&lt;/small&gt;&quot;]
+    E -- &quot;o erro de hoje vira&lt;br/&gt;o acerto do próximo treino&quot; --&gt; A
+
+    classDef banco fill:#fff,stroke:#b6bfcd,stroke-dasharray:5 4;
+    class B,D banco;
+    class R,M regra;
+    classDef regra fill:#e2f0e8,stroke:#1a7040;</pre></div>
+<p>São duas portas de entrada para o corpus, e as duas são necessárias:</p>
+<p>- <strong>Rotular na fila</strong> — a pessoa marca os indicadores direto na notícia recebida. Vai ao corpus mesmo com a lista vazia: &quot;li e não há fenômeno&quot; é o exemplo negativo que ensina o modelo a não marcar nada. Entra <strong>sem aprovação</strong>. - <strong>Aprovar a ocorrência</strong> — cada notícia vinculada vai ao corpus com os fenômenos que sobreviveram à conferência, e <strong>já aprovada</strong>. É o rótulo de melhor qualidade que existe no sistema, porque passou por duas leituras.</p>
+<h3>Estar no corpus não é estar no treino</h3>
+<p>Duas perguntas, duas colunas: <code>rotulada</code> (alguém leu e decidiu) e <code>aprovada</code> (alguém revisou e assumiu). <strong>Só o aprovado treina.</strong></p>
+<p>O motivo é a divisão de trabalho real: quem cadastra a ocorrência é o analista júnior, quem revisa é o sênior. Um rótulo errado do júnior não produz um erro visível — produz um modelo pior, que erra em notícia que ninguém está olhando. É defeito que não aparece em tela nenhuma, e por isso a trava é na consulta de treino (<code>corpus.TREINAVEL</code>) e não na confiança.</p>
+<p>Mudar o rótulo derruba a aprovação: rótulo novo é afirmação nova, e quem assinou a anterior não assinou esta. O que não está aprovado fica visível e editável em <code>/corpus</code>, esperando revisão — é exatamente a fila de trabalho do sênior, e não lixo.</p>
+<p>Aprovar a ocorrência tem a caixa <strong>servir de exemplo de treino</strong> marcada por padrão. Desmarcá-la grava a notícia no corpus sem aprovação, em vez de não gravar: serve ao registro que está certo mas é exemplo ruim — texto truncado, duas ocorrências misturadas, fonte duvidosa.</p>
+<p><strong>A trava dos 30.</strong> O treino só roda quando CADA classe do catálogo tem 30 positivos aprovados, na tela e na linha de comando. Antes era só um aviso, e o que ele deixava passar era pior que o incômodo: uma classe com 2 exemplos — ou com zero, num indicador recém-criado — treinava para dizer sempre não e saía com F1 0, que parece defeito do modelo e é falta de dado. Quando uma classe rara segura o resto, <code>rodar_treino.py --classe</code> treina só o subconjunto pronto, com a mesma trava aplicada a ele.</p>
+<h3>Indicador novo abre dois buracos, e os dois agora avisam</h3>
+<p>O catálogo é dado: <code>/gestao</code> cadastra um indicador e tudo se ajusta. O que não se ajusta sozinho:</p>
+<p>| buraco | o que o sistema faz | |---|---| | O modelo treinado <strong>ignora</strong> a classe nova — a inferência lê os rótulos do manifesto dele, não do catálogo | <code>inferencia.defasagem()</code> compara os dois; <code>/modelos</code> e <code>/recebidas</code> mostram aviso vermelho nomeando o que falta | | O corpus existente vira exemplo <strong>negativo</strong> dela, porque aquelas notícias nunca foram lidas com a pergunta | o indicador guarda <code>criado_em</code>; <code>/corpus</code> conta as anteriores e oferece o filtro *Reler por causa de* |</p>
+<p>O segundo é o mais caro: se trinta notícias antigas de fato sustentam o indicador novo, o corpus está ensinando que não sustentam, e o sintoma é um indicador que o modelo nunca marca.</p>
+<p>Depois de treinar, <strong>Reavaliar o arquivo</strong> em <code>/recebidas</code> relê o acervo com o modelo novo. É o passo que recupera a notícia arquivada antes de o indicador existir.</p>
+<p>Sem esse registro o erro do BERT desaparece assim que a LLM o corrige: o registro final fica certo e ninguém fica sabendo que o classificador errou.</p>
+</main>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  const escuro = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: escuro ? "dark" : "default",
+    flowchart: { useMaxWidth: true, htmlLabels: true },
+  });
+</script>
+</html>

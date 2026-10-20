@@ -3,31 +3,54 @@
 {% block conteudo %}
 <h1>Gestão de indicadores e skills</h1>
 <p class="suave">
-  Permite ampliar o sistema sem mexer no código. Indicadores de <strong>regra</strong>
-  são calculados sobre a lista de vítimas; os de <strong>texto</strong> usam a skill
-  abaixo na validação pela LLM e exigem exemplos rotulados para retreinar o BERTimbau.
+  Permite ampliar o sistema sem mexer no código. Todo indicador é classificado a
+  partir do <strong>texto</strong> da notícia: esta lista é, literalmente, a
+  lista de classes do modelo. A <strong>skill</strong> de cada um é o prompt que
+  vai à LLM — e vai só quando o BERT marca aquele indicador, que é o que mantém
+  a chamada barata. A <strong>regra</strong> é opcional e não substitui a
+  classificação: ela confere o indicador depois, sobre a lista de vítimas que a
+  LLM extraiu.
+</p>
+<p class="aviso aviso-aviso">
+  Mudar esta lista não muda o modelo em uso. Um indicador novo só passa a ser
+  marcado depois de receber exemplos rotulados no corpus e de um novo treino —
+  os pesos salvos conhecem as classes que existiam quando foram treinados.
 </p>
 
 <div class="cartao">
   <h2>Indicadores cadastrados ({{ indicadores|length }})</h2>
-  <table>
-    <thead><tr><th>Nome</th><th>Tipo</th><th>Definição</th><th></th></tr></thead>
+  <div class="rolagem">
+<table>
+    <thead><tr><th>Nome</th><th>Definição e prompt</th><th>Conferência</th><th></th></tr></thead>
     <tbody>
       {% for i in indicadores %}
       <tr>
         <td>
           <strong>{{ i.rotulo }}</strong><br>
-          <span class="suave">{{ i.nome }}</span>
+          <span class="suave">{{ i.nome }}</span><br>
+          <span class="etiqueta {{ 'texto' if i.decidido_por == 'bert' else 'regra' if i.decidido_por == 'regra' else '' }}">
+            decidido por {{ i.decidido_por }}
+          </span>
+          {% if i.classe == 'circunstancia' %}<span class="etiqueta">circunstância</span>{% endif %}
         </td>
-        <td><span class="etiqueta {{ i.tipo }}">{{ i.tipo }}</span></td>
         <td>
           {{ i.definicao }}
-          {% if i.skill %}<details><summary>Skill da LLM</summary><p class="suave">{{ i.skill }}</p></details>{% endif %}
-          {% if i.regra %}<p class="suave">Regra: {{ i.regra.operacao }} · campo {{ i.regra.campo }} · valor {{ i.regra.valor }}{% if i.regra.minimo %} · mínimo {{ i.regra.minimo }}{% endif %}</p>{% endif %}
-          {% if i.exemplos %}<details><summary>{{ i.exemplos|length }} exemplo(s) rotulado(s)</summary><ul class="suave">{% for e in i.exemplos %}<li>{{ e }}</li>{% endfor %}</ul></details>{% endif %}
+          {% if i.skill %}<details><summary>Prompt enviado à LLM</summary><p class="suave">{{ i.skill }}</p></details>{% endif %}
+          {% if i.exemplos %}<details><summary>{{ i.exemplos|length }} exemplo(s) de anotação</summary><ul class="suave">{% for e in i.exemplos %}<li>{{ e }}</li>{% endfor %}</ul></details>{% endif %}
+        </td>
+        <td class="suave">
+          {% if i.regra %}
+            {{ i.regra.operacao }} · campo {{ i.regra.campo }} · valor {{ i.regra.valor }}{% if i.regra.minimo %} · mínimo {{ i.regra.minimo }}{% endif %}
+          {% else %}
+            —
+          {% endif %}
         </td>
         <td class="direita">
-          <form method="post" action="{{ url_for('excluir_indicador', nome=i.nome) }}">
+          <a href="{{ url_for('gestao', editar=i.nome) }}#formulario">
+            <button class="secundario" type="button">Editar</button>
+          </a>
+          <form method="post" action="{{ url_for('excluir_indicador', nome=i.nome) }}"
+                style="margin-top:6px">
             <button class="perigo" type="submit">Excluir</button>
           </form>
         </td>
@@ -35,85 +58,227 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 
-<div class="cartao">
-  <h2>Cadastrar ou editar indicador</h2>
-  <p class="suave">Usar um nome já existente substitui o indicador atual.</p>
+<div class="cartao" id="formulario">
+  <div class="entre">
+    <h2>{{ 'Editando: ' ~ edicao.nome if edicao else 'Cadastrar ou editar indicador' }}</h2>
+    {% if edicao %}
+      <a href="{{ url_for('gestao') }}"><button class="secundario" type="button">Cancelar edição</button></a>
+    {% endif %}
+  </div>
+  {% if edicao %}
+    <p class="aviso aviso-ok">
+      Formulário carregado com o indicador <code>{{ edicao.nome }}</code>. Aqui o
+      que você <strong>desmarcar é removido</strong> — o formulário manda o estado
+      completo. Mexer só no prompt e salvar preserva todo o resto.
+    </p>
+  {% else %}
+    <p class="suave">
+      Usar um nome já existente <strong>atualiza</strong> o indicador: os campos
+      que você preencher substituem os antigos, e os que deixar em branco são
+      mantidos como estão. Para editar com tudo à vista, use o botão
+      <strong>Editar</strong> na lista acima.
+    </p>
+  {% endif %}
   <form method="post">
+    <input type="hidden" name="editando" value="{{ '1' if edicao else '' }}">
     <div class="linha">
       <div>
         <label for="nome">Nome (slug)</label>
-        <input id="nome" name="nome" required placeholder="crianca_adolescente_baleado">
+        <input id="nome" name="nome" required placeholder="crianca_adolescente_baleado"
+               value="{{ edicao.nome if edicao else '' }}"
+               {% if edicao %}readonly{% endif %}>
       </div>
       <div>
         <label for="rotulo">Rótulo exibido</label>
-        <input id="rotulo" name="rotulo" placeholder="Criança ou adolescente baleado">
+        <input id="rotulo" name="rotulo" placeholder="Criança ou adolescente baleado"
+               value="{{ edicao.rotulo if edicao else '' }}">
+      </div>
+    </div>
+
+    <div class="linha" style="margin-top:12px">
+      <div>
+        <label for="decidido_por">Quem decide este indicador</label>
+        <select id="decidido_por" name="decidido_por">
+          {% set decisor = edicao.decidido_por if edicao else 'bert' %}
+          <option value="bert" {% if decisor == 'bert' %}selected{% endif %}>
+            bert — classe do classificador: entra no corpus e no treino
+          </option>
+          <option value="llm" {% if decisor == 'llm' %}selected{% endif %}>
+            llm — sem classe no BERT: a LLM decide dentro do bloco de outra classe
+          </option>
+          <option value="regra" {% if decisor == 'regra' %}selected{% endif %}>
+            regra — calculado pelo sistema sobre a lista de vítimas
+          </option>
+        </select>
       </div>
       <div>
-        <label for="tipo">Tipo</label>
-        <select id="tipo" name="tipo">
-          <option value="texto">texto (BERTimbau + skill da LLM)</option>
-          <option value="regra">regra (sobre as vítimas)</option>
+        <label for="classe">Onde o resultado vai</label>
+        <select id="classe" name="classe">
+          {% set onde = edicao.classe if edicao else 'fenomeno' %}
+          <option value="fenomeno" {% if onde != 'circunstancia' %}selected{% endif %}>
+            fenomeno — FENÔMENO OBSERVADO da ocorrência
+          </option>
+          <option value="circunstancia" {% if onde == 'circunstancia' %}selected{% endif %}>
+            circunstancia — CIRCUNSTÂNCIA de cada vítima
+          </option>
         </select>
+      </div>
+    </div>
+    <p class="suave" style="margin-top:6px">
+      <strong>Quem decide</strong> é o campo mais consequente da tela: só os de
+      <code>bert</code> formam a lista de classes do modelo, e tirar um daqui o
+      remove do próximo treino. Os de <code>regra</code> não são marcados por
+      ninguém — saem da contagem das vítimas, que é exata, enquanto a leitura não.
+    </p>
+
+    <div style="margin-top:12px">
+      <label for="definicao">Definição — aparece para o anotador e abre o prompt</label>
+      <textarea id="definicao" name="definicao" rows="2" required>{{ edicao.definicao if edicao else '' }}</textarea>
+    </div>
+
+    <div style="margin-top:12px">
+      <label for="skill">Prompt do indicador — o que a LLM deve fazer quando ele é marcado</label>
+      <textarea id="skill" name="skill" rows="8"
+                placeholder="Este indicador já foi classificado pelo BERT. Extraia... NÃO conta quando...">{{ edicao.skill if edicao else '' }}</textarea>
+      <p class="suave">
+        Este texto só viaja para a LLM quando o BERT marca este indicador — é o
+        que mantém a chamada barata. {% if edicao and edicao.skill %}São
+        {{ edicao.skill|length }} caracteres hoje.{% endif %}
+      </p>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Circunstâncias que este indicador destrava nas vítimas</label>
+      <p class="suave" style="margin-top:0">
+        A LLM só pode marcar uma circunstância <strong>condicionada</strong> na
+        vítima quando o indicador que a destrava foi marcado pelo BERT. É o que
+        impede o modelo de sair procurando feminicídio em notícia sem mulher
+        baleada. As não condicionadas estão sempre disponíveis e não dependem
+        desta lista.
+      </p>
+      <div class="grade-indicadores">
+        {% set marcadas = (edicao.circunstancias or []) if edicao else [] %}
+        {% for valor, rotulo in circunstancias %}
+          <label class="caixa">
+            <span class="cabeca">
+              <input type="checkbox" name="circunstancias" value="{{ valor }}"
+                     {% if valor in marcadas %}checked{% endif %}>
+              {{ rotulo }}
+            </span>
+            <span class="suave">
+              <code>{{ valor }}</code>
+              {% if valor in condicionadas %}
+                — condicionada a <code>{{ condicionadas[valor] }}</code>
+              {% else %}
+                — sempre disponível
+              {% endif %}
+            </span>
+          </label>
+        {% endfor %}
       </div>
     </div>
 
     <div style="margin-top:12px">
-      <label for="definicao">Definição</label>
-      <textarea id="definicao" name="definicao" rows="2" required></textarea>
+      <label for="saidas">Tabelas complementares que este indicador exige (JSON)</label>
+      <p class="suave" style="margin-top:0">
+        Chaves extras que a LLM deve acrescentar ao JSON de resposta quando este
+        indicador é marcado — é por aqui que ela <strong>aprofunda</strong> o que
+        o BERT apenas sinalizou. Lista JSON, um objeto por tabela, com
+        <code>chave</code>, <code>formato</code>, <code>notas</code> e
+        <code>por_vitima</code> (true quando a tabela vai dentro de cada vítima).
+        Deixe vazio se o indicador não exige nenhuma. JSON inválido não salva
+        nada, em vez de apagar o que já está aqui.
+      </p>
+      <textarea id="saidas" name="saidas" rows="8" spellcheck="false"
+                style="font-family: ui-monospace, Consolas, monospace; font-size:13px">{{ edicao.saidas_json if edicao else '' }}</textarea>
     </div>
 
-    <div id="bloco-texto" style="margin-top:12px">
-      <label for="skill">Skill — instruções que a LLM usa para confirmar o indicador</label>
-      <textarea id="skill" name="skill" rows="4"></textarea>
-      <label for="exemplos" style="margin-top:10px">Exemplos rotulados (um por linha) — usados para retreinar o BERTimbau</label>
-      <textarea id="exemplos" name="exemplos" rows="3"></textarea>
+    <div style="margin-top:12px">
+      <label for="exemplos">Exemplos de anotação (um por linha)</label>
+      <textarea id="exemplos" name="exemplos" rows="3">{{ (edicao.exemplos or []) | join('\n') if edicao else '' }}</textarea>
     </div>
 
-    <div id="bloco-regra" style="margin-top:12px; display:none">
+    <div style="margin-top:14px">
+      <label class="caixa" style="max-width:520px">
+        <span class="cabeca">
+          <input type="checkbox" id="tem_regra" name="tem_regra" value="1"
+                 {% if edicao and edicao.regra %}checked{% endif %}>
+          Tem regra de conferência sobre as vítimas
+        </span>
+        <span class="suave">
+          Marque quando o fenômeno puder ser comprovado pela lista de vítimas
+          (idade, gênero, tipo, contagem de mortos). Ele passa a ser marcado
+          também quando a regra fechar, mesmo que o texto não o tenha deixado
+          explícito — e volta a ser reavaliado quando um ferido morre. Use
+          <code>lista_contem</code> para `tipo_vitima` e `circunstancias`, que
+          são marcação múltipla.
+        </span>
+      </label>
+    </div>
+
+    {% set regra = (edicao.regra or {}) if edicao else {} %}
+    <div id="bloco-regra" style="margin-top:12px; display:{{ 'block' if regra else 'none' }}">
       <div class="linha">
         <div>
           <label for="operacao">Operação</label>
           <select id="operacao" name="operacao">
-            <option value="campo_igual">campo_igual</option>
-            <option value="campo_menor_que">campo_menor_que</option>
-            <option value="campo_preenchido">campo_preenchido</option>
-            <option value="contagem_minima">contagem_minima</option>
+            {% for valor, texto in [
+                 ('campo_igual', 'campo_igual — valor exato'),
+                 ('campo_em', 'campo_em — um de vários valores'),
+                 ('lista_contem', 'lista_contem — marcação múltipla contém o valor'),
+                 ('campo_menor_que', 'campo_menor_que — número abaixo de'),
+                 ('campo_preenchido', 'campo_preenchido — qualquer valor'),
+                 ('contagem_minima', 'contagem_minima — N vítimas com o valor')] %}
+              <option value="{{ valor }}" {% if regra.operacao == valor %}selected{% endif %}>{{ texto }}</option>
+            {% endfor %}
           </select>
         </div>
         <div>
           <label for="campo">Campo da vítima</label>
           <select id="campo" name="campo">
-            {% for c in ['idade', 'genero', 'tipo_vitima', 'situacao', 'cargo_politico', 'circunstancia'] %}
-              <option value="{{ c }}">{{ c }}</option>
+            {% for c in ['idade', 'genero', 'cor_raca', 'grupo_etario', 'tipo_vitima', 'status', 'circunstancias', 'local'] %}
+              <option value="{{ c }}" {% if regra.campo == c %}selected{% endif %}>{{ c }}</option>
             {% endfor %}
           </select>
         </div>
         <div>
           <label for="valor">Valor</label>
-          <input id="valor" name="valor" placeholder="feminino / 18 / morta">
+          <input id="valor" name="valor" placeholder="feminino / 18 / morta"
+                 value="{{ regra.valor if regra.valor is not none else '' }}">
         </div>
         <div>
           <label for="minimo">Mínimo (só para contagem_minima)</label>
-          <input id="minimo" name="minimo" type="number" min="1" placeholder="3">
+          <input id="minimo" name="minimo" type="number" min="1" placeholder="3"
+                 value="{{ regra.minimo if regra.minimo else '' }}">
         </div>
       </div>
+      {% if regra.valores %}
+      <p class="suave">
+        Esta regra usa a lista <code>valores</code>
+        ({{ regra.valores | join(', ') }}), que esta tela ainda não edita: ela é
+        preservada ao salvar, mas mudá-la exige editar
+        <code>indicadores_fonte.json</code>.
+      </p>
+      {% endif %}
     </div>
 
-    <button type="submit" style="margin-top:14px">Salvar indicador</button>
+    <button type="submit" style="margin-top:14px">
+      {{ 'Salvar alterações' if edicao else 'Salvar indicador' }}
+    </button>
   </form>
 </div>
 
 <script>
-  const tipo = document.getElementById("tipo");
-  const blocoTexto = document.getElementById("bloco-texto");
+  const temRegra = document.getElementById("tem_regra");
   const blocoRegra = document.getElementById("bloco-regra");
 
-  tipo.addEventListener("change", () => {
-    const eTexto = tipo.value === "texto";
-    blocoTexto.style.display = eTexto ? "block" : "none";
-    blocoRegra.style.display = eTexto ? "none" : "block";
-  });
+  const sincronizar = () => {
+    blocoRegra.style.display = temRegra.checked ? "block" : "none";
+  };
+  temRegra.addEventListener("change", sincronizar);
+  sincronizar();
 </script>
 {% endblock %}

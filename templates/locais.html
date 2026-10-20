@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block titulo %}Locais e listas{% endblock %}
+
+{% block conteudo %}
+<h1>Locais e listas</h1>
+<p class="suave">
+  As listas fechadas que os formulários oferecem. Elas existem para que grafias
+  diferentes do mesmo lugar — ou do mesmo cargo — não quebrem o alerta de
+  duplicidade nem as estatísticas.
+</p>
+
+<div class="cartao">
+  <h2>Estados, cidades e bairros</h2>
+  <p class="suave" style="margin-top:0">
+    <strong>{{ estatisticas.estados }}</strong> estados e
+    <strong>{{ estatisticas.cidades }}</strong> municípios vêm da API de
+    Localidades do IBGE. Os <strong>{{ estatisticas.bairros }}</strong> bairros
+    em {{ estatisticas.cidades_com_bairro }} cidades foram conferidos à mão: o
+    IBGE não publica bairros, e os distritos não substituem — o Rio de Janeiro
+    tem um distrito e 164 bairros. Acrescente aqui conforme a cobertura crescer.
+  </p>
+
+  <form method="get" class="linha">
+    <div>
+      <label for="estado">Estado</label>
+      <select id="estado" name="estado" onchange="this.form.submit()">
+        <option value="">Selecione…</option>
+        {% for s, nome in estados %}
+          <option value="{{ s }}" {% if s == sigla %}selected{% endif %}>
+            {{ s }} — {{ nome }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="cidade">Cidade</label>
+      <select id="cidade" name="cidade" onchange="this.form.submit()"
+              {% if not sigla %}disabled{% endif %}>
+        <option value="">{{ 'Selecione o estado primeiro' if not sigla else 'Selecione…' }}</option>
+        {% for c in cidades %}
+          <option value="{{ c }}" {% if c == cidade %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="align-self:end">
+      <noscript><button type="submit" class="secundario">Ver</button></noscript>
+    </div>
+  </form>
+</div>
+
+{% if sigla %}
+  <div class="cartao">
+    <h3>Cidades de {{ sigla }} <span class="suave">({{ cidades|length }})</span></h3>
+    <p class="suave" style="margin-top:0">
+      Município novo é raro, mas emancipação acontece e a lista do IBGE é de um
+      momento no tempo.
+    </p>
+    <form method="post" action="{{ url_for('locais_cidade') }}" class="linha">
+      <input type="hidden" name="estado" value="{{ sigla }}">
+      <div style="flex:2">
+        <label for="nova_cidade">Acrescentar cidade a {{ sigla }}</label>
+        <input id="nova_cidade" name="cidade" required placeholder="Nome do município">
+      </div>
+      <div style="align-self:end"><button type="submit">Acrescentar</button></div>
+    </form>
+
+    {% if cidade %}
+      <form method="post" action="{{ url_for('locais_cidade') }}"
+            onsubmit="return confirm('Remover {{ cidade }} e os seus bairros?')"
+            style="margin-top:10px">
+        <input type="hidden" name="estado" value="{{ sigla }}">
+        <input type="hidden" name="cidade" value="{{ cidade }}">
+        <input type="hidden" name="acao" value="remover">
+        <button type="submit" class="perigo pequeno">
+          Remover {{ cidade }} de {{ sigla }}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if sigla and cidade %}
+  <div class="cartao">
+    <h3>Bairros de {{ cidade }} <span class="suave">({{ bairros|length }})</span></h3>
+
+    <form method="post" action="{{ url_for('locais_bairro') }}" class="linha">
+      <input type="hidden" name="estado" value="{{ sigla }}">
+      <input type="hidden" name="cidade" value="{{ cidade }}">
+      <div style="flex:2">
+        <label for="novo_bairro">Acrescentar bairro</label>
+        <input id="novo_bairro" name="bairro" required
+               placeholder="Grafia como ela aparece nas notícias">
+      </div>
+      <div style="align-self:end"><button type="submit">Acrescentar</button></div>
+    </form>
+
+    {% if bairros %}
+      <div class="grade-indicadores" style="margin-top:14px">
+        {% for b in bairros %}
+          <div class="cartao" style="margin:0;padding:10px 12px;box-shadow:none">
+            <div class="entre">
+              <span>{{ b }}</span>
+              <form method="post" action="{{ url_for('locais_bairro') }}"
+                    onsubmit="return confirm('Remover o bairro {{ b }}?')">
+                <input type="hidden" name="estado" value="{{ sigla }}">
+                <input type="hidden" name="cidade" value="{{ cidade }}">
+                <input type="hidden" name="bairro" value="{{ b }}">
+                <input type="hidden" name="acao" value="remover">
+                <button type="submit" class="perigo pequeno">Remover</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="suave">
+        {{ cidade }} ainda não tem bairro cadastrado. Até ter, o formulário de
+        ocorrência deixa o campo vazio.
+      </p>
+    {% endif %}
+  </div>
+{% endif %}
+
+<div class="cartao">
+  <h2>Listas de agente e de político</h2>
+  <p class="suave" style="margin-top:0">
+    Alimentam as tabelas complementares de vitimização policial e de político
+    baleado, e a validação da resposta do modelo de linguagem.
+    <strong>O VALOR não pode mudar depois de gravado</strong> — ele é o que está
+    nas ocorrências antigas, e reescrevê-lo deixaria aqueles registros
+    apontando para algo que não existe mais. O rótulo, sim, pode ser reescrito à
+    vontade: é só o que a pessoa lê.
+  </p>
+</div>
+
+{% for nome, lista in editaveis.items() %}
+  <div class="cartao">
+    <h3>{{ lista.rotulo }} <span class="suave">({{ lista.itens|length }})</span></h3>
+    <form method="post" action="{{ url_for('locais_lista') }}">
+      <input type="hidden" name="lista" value="{{ nome }}">
+      <div class="rolagem">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px">Manter</th>
+              <th>Valor (gravado no banco)</th>
+              <th>Rótulo (o que aparece na tela)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for valor, rotulo in lista.itens %}
+              <tr>
+                <td>
+                  <input type="checkbox" name="manter" value="{{ valor }}" checked
+                         aria-label="Manter {{ rotulo }}">
+                </td>
+                <td>
+                  <input type="hidden" name="valor" value="{{ valor }}">
+                  <code>{{ valor }}</code>
+                </td>
+                <td><input name="rotulo" value="{{ rotulo }}" required></td>
+              </tr>
+            {% endfor %}
+            <tr>
+              <td></td>
+              <td><input name="novo_valor" placeholder="valor_novo_sem_acento"
+                         pattern="[a-z0-9_]+"
+                         title="Só minúsculas, números e sublinhado"></td>
+              <td><input name="novo_rotulo" placeholder="Rótulo do item novo"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="suave">
+        Desmarcar “manter” remove o item ao salvar. Ocorrências já gravadas com
+        ele continuam com o valor antigo — a lista governa o que se pode
+        escolher de agora em diante, não o que já foi registrado.
+      </p>
+      <div class="acoes">
+        <button type="submit">Salvar {{ lista.rotulo|lower }}</button>
+      </div>
+    </form>
+  </div>
+{% endfor %}
+{% endblock %}

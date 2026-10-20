@@ -10,7 +10,8 @@
   <div>
     <h1>Corpus de treino</h1>
     <p class="suave">
-      Notícias rotuladas à mão que ensinam os classificadores. O link e o texto
+      Notícias rotuladas à mão que ensinam o classificador. O rótulo é um só: os
+      indicadores que a notícia sustenta — vários, ou nenhum. O link e o texto
       ficam guardados para que a origem de cada rótulo seja demonstrável.
     </p>
   </div>
@@ -22,6 +23,19 @@
   </div>
 </div>
 
+{% if a_reanotar %}
+<p class="aviso aviso-erro">
+  <strong>Há notícias anotadas antes de um indicador existir.</strong>
+  Elas nunca foram lidas com a pergunta nova, e no treino contam como exemplo
+  <strong>negativo</strong> dele — é assim que se ensina ao modelo que a classe
+  nova não existe.
+  {% for slug, n in a_reanotar.items() %}
+    <br><a href="{{ url_for('corpus_repositorio', reanotar=slug) }}">
+      {{ n }} notícia(s) para reler por causa de <code>{{ slug }}</code></a>
+  {% endfor %}
+</p>
+{% endif %}
+
 <div class="cartao">
   <h2>Situação do corpus</h2>
   <div class="linha">
@@ -30,132 +44,106 @@
       <span class="suave">notícias</span>
     </div>
     <div class="indicador-caixa">
-      <span class="numero">{{ estatisticas.positivos }}</span>
-      <span class="suave">com disparo de arma de fogo</span>
+      <span class="numero">{{ estatisticas.rotuladas }}</span>
+      <span class="suave">anotadas</span>
     </div>
     <div class="indicador-caixa">
-      <span class="numero">{{ estatisticas.negativos }}</span>
-      <span class="suave">sem disparo</span>
+      <span class="numero">{{ estatisticas.treinaveis }}</span>
+      <span class="suave">aprovadas: estas treinam</span>
     </div>
     <div class="indicador-caixa">
-      <span class="numero">{{ estatisticas.nao_rotulados }}</span>
-      <span class="suave">sem rótulo</span>
+      <span class="numero">{{ estatisticas.rotuladas_sem_aprovar }}</span>
+      <span class="suave">
+        {% if estatisticas.rotuladas_sem_aprovar %}
+          <a href="{{ url_for('corpus_repositorio', aprovada='esperando') }}">esperando revisão</a>
+        {% else %}esperando revisão{% endif %}
+      </span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.negativas }}</span>
+      <span class="suave">sem nenhum indicador</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.pendentes }}</span>
+      <span class="suave">na fila de anotação</span>
     </div>
   </div>
 
-  <h3 style="margin-top:18px">Prontidão por tarefa</h3>
-  <table>
-    <thead><tr><th>Tarefa</th><th>Pode treinar</th><th>Observação</th></tr></thead>
-    <tbody>
-      {% for tarefa, rotulo in {'violencia': 'Violência armada (binária)', 'motivacao': 'Motivação principal', 'indicadores': 'Indicadores de texto'}.items() %}
-        {% set p = estatisticas.prontidao[tarefa] %}
-        <tr>
-          <td>{{ rotulo }}</td>
-          <td>
-            <span class="status status-{{ 'aprovado' if p.pode_treinar else 'nao_aprovado' }}">
-              {{ 'sim' if p.pode_treinar else 'não' }}
-            </span>
-          </td>
-          <td class="suave">{{ p.motivo }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <p class="suave" style="margin-top:10px">
-    A premissa da primeira tarefa é <strong>disparo de arma de fogo</strong>. Ela
-    precisa dos dois lados: um corpus só com casos positivos não ensina o modelo
-    a recusar nada, e a matriz de confusão fica sem as colunas que mostram o erro
-    que importa. Abaixo de {{ estatisticas.minimo_por_classe }} exemplos numa
-    classe, a métrica dela oscila muito e não sustenta conclusão.
+  {% set p = estatisticas.prontidao.indicadores %}
+  <p style="margin-top:16px">
+    Pode treinar:
+    <span class="status status-{{ 'aprovado' if p.pode_treinar else 'nao_aprovado' }}">
+      {{ 'sim' if p.pode_treinar else 'não' }}
+    </span>
+    <span class="suave">{{ p.motivo }}</span>
+  </p>
+  <p class="suave">
+    As notícias <strong>sem nenhum indicador</strong> contam tanto quanto as
+    outras: são elas que ensinam o modelo a não marcar nada quando a notícia
+    está fora do escopo, e sem elas a matriz de confusão fica sem as colunas que
+    mostram o erro que importa. Abaixo de {{ estatisticas.minimo_por_classe }}
+    exemplos num indicador, a métrica dele oscila muito e não sustenta conclusão.
   </p>
 </div>
 
 <div class="cartao">
-  <details>
-    <summary>Distribuição por motivação ({{ estatisticas.motivos.values() | sum }} rotuladas, {{ estatisticas.sem_motivo }} positivas sem motivação)</summary>
-    <table>
-      <thead><tr><th>Motivação</th><th style="width:45%">Exemplos</th><th>N</th></tr></thead>
-      <tbody>
-        {% set maximo = [estatisticas.motivos.values() | max, 1] | max %}
-        {% for slug, n in estatisticas.motivos | dictsort(by='value', reverse=true) %}
-        <tr>
-          <td>{{ slug }}</td>
-          <td>{{ barra(n, maximo, 'regra' if n >= estatisticas.minimo_por_classe else '') }}</td>
-          <td>{{ n }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </details>
-
-  <details style="margin-top:10px">
-    <summary>Distribuição por indicador de texto</summary>
-    <table>
-      <thead><tr><th>Indicador</th><th style="width:45%">Exemplos</th><th>N</th></tr></thead>
-      <tbody>
-        {% set maximo_i = [estatisticas.indicadores.values() | max, 1] | max %}
-        {% for slug, n in estatisticas.indicadores | dictsort(by='value', reverse=true) %}
-        <tr>
-          <td>{{ slug }}</td>
-          <td>{{ barra(n, maximo_i, 'regra' if n >= estatisticas.minimo_por_classe else '') }}</td>
-          <td>{{ n }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </details>
+  <h2>Distribuição por indicador</h2>
+  <div class="rolagem">
+<table>
+    <thead><tr><th>Indicador</th><th style="width:45%">Exemplos</th><th>N</th></tr></thead>
+    <tbody>
+      {% set maximo = [estatisticas.indicadores.values() | max, 1] | max %}
+      {% for slug, n in estatisticas.indicadores | dictsort(by='value', reverse=true) %}
+      <tr>
+        <td>
+          <strong>{{ estatisticas.rotulos[slug] }}</strong>
+          <br><span class="suave">{{ slug }}</span>
+        </td>
+        <td>{{ barra(n, maximo, 'regra' if n >= estatisticas.minimo_por_classe else '') }}</td>
+        <td>{{ n }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
 </div>
 
 <div class="cartao" id="nova">
   <h2>Adicionar notícia ao corpus</h2>
+  <p class="suave">
+    Cole o texto com a manchete junto, na primeira linha. Marque as classes que
+    o texto sustenta — podem ser várias. Oito são <strong>fenômenos</strong> da
+    ocorrência; suicídio e LGBTQIAPN+ são <strong>circunstâncias</strong> da
+    vítima, mas o modelo é um só e as lê juntas. O que a LLM faz depois é
+    aprofundar estas classes — preencher a ficha das vítimas e as tabelas
+    complementares —, nunca acrescentar classe que o BERT não marcou.
+  </p>
   <form method="post" action="{{ url_for('corpus_adicionar') }}">
-    <div class="linha">
-      <div style="flex:2">
-        <label for="link">Link da notícia</label>
-        <input id="link" name="link" placeholder="https://...">
-      </div>
-      <div style="flex:2">
-        <label for="titulo">Título</label>
-        <input id="titulo" name="titulo" placeholder="Manchete da notícia">
-      </div>
-    </div>
+    <label for="link">Link da notícia</label>
+    <input id="link" name="link" placeholder="https://...">
 
     <label for="texto" style="margin-top:10px">Texto da notícia</label>
-    <textarea id="texto" name="texto" rows="8" required placeholder="Cole aqui o texto"></textarea>
+    <textarea id="texto" name="texto" rows="8" required
+              placeholder="Cole aqui a manchete e o texto"></textarea>
 
-    <div class="linha" style="margin-top:12px">
-      <div>
-        <label for="violencia_armada">Houve disparo de arma de fogo?</label>
-        <select id="violencia_armada" name="violencia_armada">
-          <option value="nao_rotulado">— rotular depois —</option>
-          <option value="sim">Sim, é violência armada</option>
-          <option value="nao">Não</option>
-        </select>
-      </div>
-      <div>
-        <label for="motivo_principal">Motivação principal</label>
-        <select id="motivo_principal" name="motivo_principal">
-          <option value="">— não definida —</option>
-          {% for categoria in motivacoes %}
-            <option value="{{ categoria.nome }}">{{ categoria.nome }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div style="flex:2">
-        <label>Indicadores de texto</label>
-        <div class="linha">
-          {% for indicador in indicadores_texto %}
-            <label class="caixa">
-              <input type="checkbox" name="indicadores" value="{{ indicador.nome }}">
-              {{ indicador.rotulo }}
-            </label>
-          {% endfor %}
-        </div>
-      </div>
+    <label style="margin-top:14px">Classes</label>
+    <div class="grade-indicadores">
+      {% for indicador in catalogo %}
+        <label class="caixa">
+          <span class="cabeca">
+            <input type="checkbox" name="indicadores" value="{{ indicador.nome }}">
+            {{ indicador.rotulo }}
+            {% if indicador.classe == 'circunstancia' %}<span class="etiqueta">circunstância</span>{% endif %}
+          </span>
+          <span class="suave">{{ indicador.definicao }}</span>
+        </label>
+      {% endfor %}
     </div>
-
-    <label for="observacao" style="margin-top:10px">Observação do anotador</label>
-    <input id="observacao" name="observacao" placeholder="Por que este rótulo, em caso de dúvida">
+    <p class="suave" style="margin-top:8px">
+      Não marcar nenhum aqui manda a notícia para a <strong>fila de anotação</strong>.
+      Para registrar que nenhum indicador se aplica — que é um rótulo válido e
+      necessário — abra a notícia e salve na tela de anotação.
+    </p>
 
     <div class="linha" style="margin-top:12px">
       <button type="submit">Salvar e abrir</button>
@@ -167,18 +155,69 @@
 <div class="cartao">
   <h2>Divisão treino / validação / teste</h2>
   <p class="suave">
-    O sorteio é estratificado por violência e motivação, para que nenhuma classe
-    rara fique inteira de um lado só, e fica <strong>gravado</strong>: refazer a
-    divisão a cada treino mudaria o conjunto de teste e tornaria os modelos
-    incomparáveis entre si. Rode de novo só quando adicionar notícias.
+    Não é sorteio solto: a semente é fixa, então a mesma semente dá sempre a
+    mesma divisão. A divisão é <strong>estratificada por indicador</strong>, uma
+    notícia por vez e começando sempre pelo indicador com menos exemplos ainda
+    por distribuir — a notícia sem nenhum indicador conta como um estrato dela.
+    É isso que garante exemplo de <strong>cada</strong> indicador nas três
+    partições: sem exemplo na validação não há limiar para calibrar, e sem
+    exemplo no teste o indicador sai com F1 zero, o que parece erro do modelo e
+    é falta de dado. O resultado fica <strong>gravado</strong> na coluna
+    “conjunto”: refazer a divisão a cada treino mudaria o conjunto de teste e
+    tornaria os modelos incomparáveis entre si. Rode de novo só quando
+    adicionar notícias.
   </p>
+
+  {% set particoes = estatisticas.por_particao %}
+  {% if particoes and (particoes.treino.total or particoes.validacao.total or particoes.teste.total) %}
+  <div style="overflow-x:auto">
+    <div class="rolagem">
+<table>
+      <thead>
+        <tr>
+          <th>Conjunto</th><th>Notícias</th><th>Sem indicador</th>
+          {% for indicador in catalogo %}<th title="{{ indicador.rotulo }}">{{ indicador.nome }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in ['treino', 'validacao', 'teste'] %}
+        <tr>
+          <th>{{ p }}</th>
+          <td>{{ particoes[p].total }}</td>
+          <td class="{{ 'suave' if particoes[p].negativas else 'sem-suporte' }}">
+            {{ particoes[p].negativas }}
+          </td>
+          {% for indicador in catalogo %}
+            {% set n = particoes[p].indicadores[indicador.nome] %}
+            <td class="{{ 'suave' if n else 'sem-suporte' }}">{{ n }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <p class="suave" style="margin-top:10px">
+    Zero na linha da <strong>validação</strong> significa que aquele indicador
+    vai ficar no corte neutro de 0,5, onde um indicador raro desaparece. Zero na
+    linha do <strong>teste</strong> significa que ele não será medido. Nos dois
+    casos a solução é a mesma: anotar mais notícias daquele indicador e sortear
+    a divisão de novo.
+  </p>
+  {% endif %}
   <form method="post" action="{{ url_for('corpus_dividir') }}" class="linha">
     <div>
       <label for="semente">Semente</label>
       <input id="semente" name="semente" type="number" value="42" style="width:110px">
     </div>
-    <div style="align-self:end">
-      <button type="submit">Sortear divisão</button>
+    <div style="align-self:end; flex:0">
+      <span class="com-balao">
+        <button type="submit" class="secundario">Sortear divisão</button>
+        <span class="balao" role="tooltip">
+          <span class="titulo-balao">O código que este botão roda — corpus.dividir()</span>
+          <pre>{{ codigo_divisao }}</pre>
+        </span>
+      </span>
     </div>
   </form>
 </div>
@@ -186,15 +225,26 @@
 <div class="cartao">
   <h2>Importar planilha</h2>
   <p class="suave">
-    Colunas aceitas: <code>link</code>, <code>titulo</code>, <code>texto</code>
-    (obrigatória), <code>violencia_armada</code> (sim/nao), <code>motivo_principal</code>,
-    <code>indicadores</code> (separados por vírgula) e <code>observacao</code>.
+    Colunas aceitas: <code>link</code>, <code>texto</code> (obrigatória),
+    <code>indicadores</code> (nomes separados por vírgula) e
+    <code>anotada</code> (<code>1</code> para marcar como anotada mesmo sem
+    nenhum indicador).
   </p>
   <form method="post" action="{{ url_for('corpus_importar') }}" enctype="multipart/form-data" class="linha">
     <div style="flex:2">
       <input type="file" name="arquivo" accept=".xlsx" required>
     </div>
     <div><button type="submit" class="secundario">Importar</button></div>
+    <label class="caixa" style="flex:2">
+      <span class="cabeca">
+        <input type="checkbox" name="aprovar" value="1">
+        Já aprovar para o treino
+      </span>
+      <span class="suave">
+        Marque só se este corpus já foi revisado fora daqui. Desmarcado, as
+        notícias entram esperando revisão e não treinam o modelo.
+      </span>
+    </label>
   </form>
 </div>
 
@@ -206,39 +256,59 @@
 
   <form method="get" class="linha" style="margin-bottom:14px">
     <div>
-      <label for="f_violencia">Rótulo binário</label>
-      <select id="f_violencia" name="violencia_armada">
-        <option value="">Todos</option>
-        <option value="sim" {% if filtros.violencia_armada == 'sim' %}selected{% endif %}>Violência armada</option>
-        <option value="nao" {% if filtros.violencia_armada == 'nao' %}selected{% endif %}>Não é</option>
-        <option value="nao_rotulado" {% if filtros.violencia_armada == 'nao_rotulado' %}selected{% endif %}>Sem rótulo</option>
+      <label for="f_rotulada">Anotação</label>
+      <select id="f_rotulada" name="rotulada">
+        <option value="">Todas</option>
+        <option value="sim" {% if filtros.rotulada == 'sim' %}selected{% endif %}>Anotadas</option>
+        <option value="nao" {% if filtros.rotulada == 'nao' %}selected{% endif %}>Na fila</option>
+        <option value="sem_indicador" {% if filtros.rotulada == 'sem_indicador' %}selected{% endif %}>Anotadas sem indicador</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="f_aprovada">Aprovação</label>
+      <select id="f_aprovada" name="aprovada">
+        <option value="">Todas</option>
+        <option value="esperando" {% if filtros.aprovada == 'esperando' %}selected{% endif %}>Esperando revisão</option>
+        <option value="sim" {% if filtros.aprovada == 'sim' %}selected{% endif %}>Aprovadas (treinam)</option>
+        <option value="nao" {% if filtros.aprovada == 'nao' %}selected{% endif %}>Não aprovadas</option>
       </select>
     </div>
     <div>
-      <label for="f_motivo">Motivação</label>
-      <select id="f_motivo" name="motivo_principal">
-        <option value="">Todas</option>
-        <option value="sem_motivo" {% if filtros.motivo_principal == 'sem_motivo' %}selected{% endif %}>Positiva sem motivação</option>
-        {% for categoria in motivacoes %}
-          <option value="{{ categoria.nome }}" {% if filtros.motivo_principal == categoria.nome %}selected{% endif %}>{{ categoria.nome }}</option>
+      <label for="f_indicador">Indicador</label>
+      <select id="f_indicador" name="indicador">
+        <option value="">Todos</option>
+        {% for indicador in catalogo %}
+          <option value="{{ indicador.nome }}" {% if filtros.indicador == indicador.nome %}selected{% endif %}>{{ indicador.rotulo }}</option>
         {% endfor %}
       </select>
     </div>
+    {% if a_reanotar %}
     <div>
-      <label for="f_particao">Partição</label>
+      <label for="f_reanotar" title="Anotadas antes de o indicador existir">Reler por causa de</label>
+      <select id="f_reanotar" name="reanotar">
+        <option value="">—</option>
+        {% for slug in a_reanotar %}
+          <option value="{{ slug }}" {% if filtros.reanotar == slug %}selected{% endif %}>{{ estatisticas.rotulos[slug] or slug }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div>
+      <label for="f_particao">Conjunto</label>
       <select id="f_particao" name="particao">
-        <option value="">Todas</option>
+        <option value="">Todos</option>
         {% for p in ['treino', 'validacao', 'teste'] %}
           <option value="{{ p }}" {% if filtros.particao == p %}selected{% endif %}>{{ p }}</option>
         {% endfor %}
       </select>
     </div>
     <div style="flex:2">
-      <label for="f_busca">Buscar no texto, título ou link</label>
+      <label for="f_busca">Buscar no texto ou no link</label>
       <input id="f_busca" name="busca" value="{{ filtros.busca }}">
     </div>
     <div style="align-self:end" class="linha">
-      <button type="submit">Buscar</button>
+      <button type="submit" class="secundario">Buscar</button>
       {% if filtros_ativos %}
         <a href="{{ url_for('corpus_repositorio') }}"><button class="secundario" type="button">Limpar</button></a>
       {% endif %}
@@ -248,9 +318,14 @@
   {% if not noticias %}
     <p class="suave">Nenhuma notícia com esses filtros.</p>
   {% else %}
-  <table>
+  <div class="rolagem">
+<table>
     <thead>
-      <tr><th>#</th><th>Notícia</th><th>Disparo</th><th>Motivação</th><th>Indicadores</th><th>Partição</th></tr>
+      <tr>
+        <th>#</th><th>Notícia</th><th>Indicadores</th>
+        <th title="Só o aprovado treina o modelo. Quem aprova é quem revisa, não quem cadastra">Aprovação</th>
+        <th title="Em qual dos três conjuntos esta notícia caiu no sorteio da divisão">Conjunto</th>
+      </tr>
     </thead>
     <tbody>
       {% for n in noticias %}
@@ -258,25 +333,41 @@
         <td><a href="{{ url_for('corpus_noticia', noticia_id=n.id) }}">{{ n.id }}</a></td>
         <td>
           <a href="{{ url_for('corpus_noticia', noticia_id=n.id) }}">
-            {{ n.titulo or (n.texto[:70] ~ '...') }}
+            {{ n.texto[:80] }}{% if n.texto|length > 80 %}...{% endif %}
           </a>
           {% if n.link %}<br><span class="suave">{{ n.link[:60] }}</span>{% endif %}
         </td>
         <td>
-          {% if n.violencia_armada == 1 %}<span class="etiqueta regra">sim</span>
-          {% elif n.violencia_armada == 0 %}<span class="etiqueta">não</span>
-          {% else %}<span class="suave">—</span>{% endif %}
+          {% for i in n.indicadores %}<span class="etiqueta texto">{{ estatisticas.rotulos[i] or i }}</span>{% endfor %}
+          {% if not n.indicadores %}
+            {% if n.rotulada %}<span class="etiqueta">nenhum</span>
+            {% else %}<span class="suave">na fila</span>{% endif %}
+          {% endif %}
         </td>
-        <td>{{ n.motivo_principal or '—' }}</td>
         <td>
-          {% for i in n.indicadores %}<span class="etiqueta texto">{{ i }}</span>{% endfor %}
-          {% if not n.indicadores %}<span class="suave">—</span>{% endif %}
+          {% if not n.rotulada %}
+            <span class="suave">sem rótulo ainda</span>
+          {% elif n.aprovada %}
+            <span class="etiqueta regra">aprovada</span>
+            {% if n.aprovada_por %}<br><span class="suave">{{ n.aprovada_por }}</span>{% endif %}
+            <form method="post" action="{{ url_for('corpus_aprovar', noticia_id=n.id) }}" style="margin-top:4px">
+              <input type="hidden" name="aprovada" value="0">
+              <button class="secundario" type="submit">Devolver</button>
+            </form>
+          {% else %}
+            <span class="etiqueta">esperando revisão</span>
+            <form method="post" action="{{ url_for('corpus_aprovar', noticia_id=n.id) }}" style="margin-top:4px">
+              <input type="hidden" name="aprovada" value="1">
+              <button type="submit">Aprovar</button>
+            </form>
+          {% endif %}
         </td>
         <td class="suave">{{ n.particao or '—' }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% endif %}
 </div>
 

@@ -17,7 +17,7 @@
     <div>
       <h2><a href="{{ url_for('ocorrencia', ocorrencia_id=o.id) }}">Ocorrência #{{ o.id }}</a></h2>
       <p class="suave">
-        {{ o.data_fato }} · {{ o.cidade }} — {{ o.bairro }} · analista {{ o.analista }}
+        {{ o.id_caso }} · {{ o.data_caso }} · {{ o.cidade }}/{{ o.estado }} — {{ o.bairro }} · analista {{ o.analista }}
       </p>
     </div>
     {% if o.alertas %}
@@ -26,8 +26,7 @@
   </div>
 
   <p>
-    <strong>{{ o.motivo_principal or 'sem motivação' }}</strong>
-    {% for i in o.indicadores %}<span class="etiqueta">{{ rotulos_indicadores.get(i, i) }}</span>{% endfor %}
+    {% for i in o.fenomenos %}<span class="etiqueta">{{ rotulos_fenomeno.get(i, i) }}</span>{% endfor %}
   </p>
 
   <div class="linha">
@@ -37,6 +36,19 @@
         <input name="observacao" style="flex:2">
         <button type="submit">Aprovar</button>
       </div>
+      <label class="caixa" style="margin-top:8px">
+        <span class="cabeca">
+          <input type="checkbox" name="treinar" value="1" checked>
+          Servir de exemplo de treino
+        </span>
+      </label>
+      <p class="suave" style="margin:4px 0 0">
+        Aprovar é o que autoriza estas notícias a treinar o classificador.
+        Desmarque se o registro está certo mas a notícia é um exemplo ruim —
+        texto truncado, duas ocorrências misturadas, fonte duvidosa. Ela vai
+        para o corpus sem aprovação e espera revisão em
+        <a href="{{ url_for('corpus_repositorio', aprovada='esperando') }}">Corpus</a>.
+      </p>
     </form>
     <form method="post" action="{{ url_for('reprovar', ocorrencia_id=o.id) }}" style="flex:1">
       <label>Motivo da devolução</label>

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<h1>Prompts da LLM</h1>
+<p class="suave">
+  O que esta aplicação manda numa chamada é a soma de cinco coisas, e nenhuma
+  delas fica escondida no código. Aqui estão as que vão em <strong>toda</strong>
+  chamada — o prompt mestre, o formato de saída e os cabeçalhos da tarefa de
+  classes. O prompt de cada <em>indicador</em> fica em
+  <a href="{{ url_for('gestao') }}">Gestão</a>, porque ele só viaja quando o BERT
+  marca aquele indicador.
+</p>
+
+<div class="cartao">
+  <h2>Como a chamada é montada</h2>
+  <div class="rolagem">
+<table>
+    <thead><tr><th>#</th><th>Parte</th><th>Onde se edita</th><th>Quando viaja</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Seções do dicionário (papel, recorte, regras de desempate)</td>
+        <td class="suave"><code>categorias_fonte.json</code> → gerado em <code>dicionario_categorias.txt</code></td>
+        <td class="suave">sempre</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>Prompt mestre</strong> — ocorrência e vítimas</td>
+        <td><a href="#prompt_mestre">nesta tela</a></td>
+        <td class="suave">sempre</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>Formato de saída</strong></td>
+        <td><a href="#formato">nesta tela</a></td>
+        <td class="suave">sempre</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>Cabeçalho da tarefa de classes</strong> (um dos três)</td>
+        <td><a href="#classes_marcadas">nesta tela</a></td>
+        <td class="suave">sempre, conforme a situação</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Skill de cada indicador</td>
+        <td><a href="{{ url_for('gestao') }}">Gestão</a></td>
+        <td class="suave">só quando o BERT marca aquele indicador</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="linha" style="margin-top:12px">
+    <div class="indicador-caixa">
+      <span class="numero">{{ tamanhos.nucleo }}</span>
+      <span class="suave">núcleo fixo (partes 1 a 3)</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ tamanhos.duas_classes }}</span>
+      <span class="suave">com 2 classes marcadas</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ tamanhos.nenhuma }}</span>
+      <span class="suave">com nenhuma classe</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero sem-suporte">{{ tamanhos.sem_modelo }}</span>
+      <span class="suave">sem modelo treinado</span>
+    </div>
+  </div>
+  <p class="suave" style="margin-top:10px">
+    Caracteres. A última caixa é a chamada que acontece quando não há modelo
+    treinado: vão os blocos de todas as classes. É cerca de {{ (tamanhos.sem_modelo / tamanhos.duas_classes) | round(1) }}×
+    a chamada normal — e é exatamente isso que a marcação do BERT existe para
+    evitar.
+  </p>
+</div>
+
+<form method="post">
+  {% for nome in ordem %}
+    {% set bloco = blocos[nome] %}
+    <div class="cartao" id="{{ nome }}">
+      <div class="entre">
+        <h2>{{ bloco.rotulo }}</h2>
+        <div>
+          {% if bloco.editado %}
+            <span class="etiqueta regra">editado</span>
+          {% else %}
+            <span class="suave">padrão de fábrica</span>
+          {% endif %}
+        </div>
+      </div>
+      <p class="suave">{{ bloco.descricao }}</p>
+
+      {% if marcadores[nome] %}
+        <p class="suave">
+          <strong>Marcadores que este bloco aceita.</strong> O sistema os troca
+          pelo valor na hora de montar a chamada; apagar um faz a LLM deixar de
+          receber aquela lista.
+        </p>
+        <div class="rolagem">
+<table>
+          <tbody>
+            {% for marcador, significado in marcadores[nome].items() %}
+            <tr>
+              <td style="width:170px"><code>{{ '{' }}{{ marcador }}{{ '}' }}</code></td>
+              <td class="suave">{{ significado }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      {% endif %}
+
+      <label for="campo_{{ nome }}" style="margin-top:10px">
+        Texto enviado à LLM ({{ bloco.texto|length }} caracteres)
+      </label>
+      <textarea id="campo_{{ nome }}" name="{{ nome }}" spellcheck="false"
+                rows="{{ 26 if nome in ('prompt_mestre', 'formato') else 10 }}"
+                style="font-family: ui-monospace, Consolas, monospace; font-size:13px">{{ bloco.texto }}</textarea>
+
+      {% if bloco.editado %}
+        <p style="margin-top:8px">
+          <button type="submit" name="restaurar" value="{{ nome }}" class="secundario">
+            Restaurar padrão deste bloco
+          </button>
+        </p>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <div class="cartao">
+    <button type="submit">Salvar todos os prompts</button>
+    <p class="suave" style="margin-top:10px">
+      Só o que difere do padrão é gravado em <code>prompts_fonte.json</code>. Um
+      bloco que você não personalizou continua vindo do padrão, e assim uma
+      melhoria futura nele chega sem apagar o seu texto. Prompt vazio não é
+      salvo — para voltar ao original use <strong>Restaurar padrão</strong>.
+    </p>
+  </div>
+</form>
+{% endblock %}

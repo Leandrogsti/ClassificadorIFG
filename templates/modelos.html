@@ -11,9 +11,88 @@
   infla o resultado.
 </p>
 
+{% if defasagem.defasado %}
+<p class="aviso aviso-erro">
+  <strong>O modelo em produção está defasado em relação ao catálogo.</strong>
+  {% if defasagem.ausentes %}
+    Ele não conhece
+    {% for n in defasagem.ausentes %}
+      <code>{{ n }}</code>{{ ', ' if not loop.last }}
+    {% endfor %}
+    — e por isso <strong>nunca marca</strong> {{ 'esses indicadores' if defasagem.ausentes|length > 1 else 'esse indicador' }}.
+    Notícia que só sustente {{ 'um deles' if defasagem.ausentes|length > 1 else 'ele' }} vai direto para o arquivo, em silêncio.
+  {% endif %}
+  {% if defasagem.obsoletos %}
+    Ele ainda carrega
+    {% for n in defasagem.obsoletos %}
+      <code>{{ n }}</code>{{ ', ' if not loop.last }}
+    {% endfor %}, que saíram do catálogo.
+  {% endif %}
+  Retreine e depois use <em>Reavaliar o arquivo</em> em
+  <a href="{{ url_for('fila_recebidas') }}">Recebidas</a>.
+</p>
+{% endif %}
+
+<div class="cartao">
+  <h2>Três estratégias para a mesma saída multirrótulo</h2>
+  <p class="suave">
+    A tarefa é <strong>multirrótulo</strong>: a pergunta não é qual é o
+    indicador da notícia, é quais dos oito ela sustenta. Em qualquer das três
+    estratégias cada indicador tem a sua própria saída, passa pela sua própria
+    sigmoide e decide sozinho se entra — não há <code>softmax</code>, não há
+    competição entre as classes e uma notícia pode sair com nenhuma, com uma ou
+    com todas.
+  </p>
+  <div class="rolagem">
+<table>
+    <thead>
+      <tr><th>Estratégia</th><th>O que é</th><th>Redes</th><th>Custo</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>unico</code></td>
+        <td>Uma rede com uma saída sigmoide por indicador</td>
+        <td>1</td>
+        <td class="suave">um treino, um checkpoint, uma passagem por notícia</td>
+      </tr>
+      <tr>
+        <td><code>por_indicador</code></td>
+        <td>Uma rede binária por indicador (um-contra-resto)</td>
+        <td>{{ estatisticas.indicadores | length }}</td>
+        <td class="suave">
+          {{ estatisticas.indicadores | length }} treinos,
+          {{ estatisticas.indicadores | length }} checkpoints em disco e
+          {{ estatisticas.indicadores | length }} redes carregadas na memória
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="suave" style="margin-top:10px">
+    Em <code>unico</code> o encoder é compartilhado, então o que o modelo
+    aprende sobre a linguagem das notícias serve a todos os indicadores. Em
+    <code>por_indicador</code> cada indicador ganha uma rede inteira, com o seu
+    próprio ponto de parada, e um indicador raro não disputa a capacidade da
+    rede com os frequentes — ao preço de multiplicar treino, disco e memória.
+    Qual das duas vence <strong>não se decide por argumento</strong>: as duas
+    são medidas na mesma partição de teste e aparecem como linhas da tabela
+    abaixo.
+  </p>
+  <p class="suave">
+    Duas correções pesam mais que a escolha entre elas num corpus pequeno e
+    desbalanceado, e valem para as duas: o <strong>peso das classes</strong> na
+    perda, sem o qual um modelo que nunca marca uma classe rara já tem perda
+    quase mínima; e o <strong>limiar por indicador</strong>, calibrado na
+    validação, sem o qual a classe rara fica abaixo do 0,5 fixo mesmo quando é a
+    certa. As duas juntas são a diferença entre "o modelo marca um indicador" e
+    "o modelo marca os que se aplicam".
+  </p>
+</div>
+
 <div class="cartao">
   <h2>Ambiente de execução</h2>
-  <table>
+  <div class="rolagem">
+<table>
     <tbody>
       <tr><th>torch</th><td>{{ ambiente.torch }}</td></tr>
       <tr><th>CUDA disponível</th><td>{{ 'sim' if ambiente.cuda_disponivel else 'não' }}</td></tr>
@@ -21,6 +100,7 @@
       <tr><th>Dispositivo em uso</th><td><strong>{{ ambiente.dispositivo }}</strong></td></tr>
     </tbody>
   </table>
+  </div>
   <p class="suave" style="margin-top:10px">
     O treino roda igual nos dois: <code>--dispositivo auto</code> usa a GPU quando
     existe e cai para CPU quando não. Em CPU é bem mais lento, mas o resultado é o
@@ -30,28 +110,59 @@
 
 <div class="cartao">
   <h2>Como rodar o treino</h2>
-  <pre class="comando"># sorteia a divisão e compara os 6 modelos na tarefa binária
-python rodar_treino.py --dividir --tarefa violencia
+  <p class="suave">
+    <strong>Um comando treina os {{ catalogo|length }} modelos.</strong>
+    <code>--dividir</code> sorteia a divisão e percorre todos eles com todas as
+    {{ grade|length }} configurações da grade, uma execução por vez, gravando uma
+    linha no banco a cada uma — é a tabela do fim da página que se forma.
+    <code>--modelo</code> e <code>--grade</code> servem para estreitar quando se
+    quer inspecionar rápido, não para rodar um por um à mão.
+  </p>
+  <p class="suave">
+    As execuções são <strong>sequenciais de propósito</strong>: há uma placa de
+    vídeo, e dois BERTs treinando ao mesmo tempo disputariam a mesma memória —
+    ficaria mais lento, ou não caberia. O que o comando garante é que uma falha
+    não interrompe as demais, de modo que a comparação completa sai de uma só
+    chamada, mesmo que algum modelo não caiba no equipamento.
+  </p>
+  <pre class="comando"># sorteia a divisão e compara os 6 modelos na estratégia padrão
+python rodar_treino.py --dividir
 
-# as três tarefas em sequência
-python rodar_treino.py --tarefa todas
+# compara as DUAS estratégias na mesma partição de teste
+python rodar_treino.py --estrategia ambas --grade 1
+
+# um modelo por indicador, uma configuração só
+python rodar_treino.py --estrategia por_indicador --modelo bertimbau-base --grade 1
 
 # força CPU (máquina sem placa de vídeo)
-python rodar_treino.py --tarefa violencia --dispositivo cpu
+python rodar_treino.py --dispositivo cpu
 
-# uma combinação só, para inspecionar rápido
-python rodar_treino.py --tarefa motivacao --modelo bertimbau-base --grade 1</pre>
+# mede o efeito das correções de desbalanceamento, desligando-as
+python rodar_treino.py --sem-peso-classes --sem-calibrar-limiar --grade 1</pre>
   <p class="suave">
     Cada execução grava uma linha com as métricas no banco, e os pesos do melhor
-    modelo de cada tarefa vão para <code>modelos/&lt;tarefa&gt;</code>. Falhas
-    (falta de memória na GPU, por exemplo) também são registradas — um modelo que
-    não cabe na placa é resultado, não motivo para omitir a linha.
+    modelo vão para <code>modelos/indicadores</code>, com um
+    <code>modelo.json</code> que diz a estratégia, a ordem dos rótulos e o
+    limiar de cada indicador — é esse manifesto que a aplicação lê em produção
+    para marcar a notícia antes de chamar a LLM. As duas estratégias convivem em
+    disco, em subpastas separadas: treinar uma não apaga a outra, e o manifesto
+    é o que decide qual responde. Falhas (falta de memória na GPU, por exemplo)
+    também são registradas — um modelo que não cabe na placa é resultado, não
+    motivo para omitir a linha.
   </p>
 </div>
 
 <div class="cartao">
   <h2>Catálogo de modelos comparados</h2>
-  <table>
+  <p class="suave">
+    Esta tabela <strong>não é resultado</strong>: é a lista dos
+    {{ catalogo|length }} modelos pré-treinados que a comparação baixa e ajusta.
+    Nenhum deles sabe classificar estes indicadores ao chegar — todos passam pelo
+    mesmo ajuste fino sobre o mesmo corpus, e é essa a comparação. Os resultados
+    ficam na tabela do fim da página.
+  </p>
+  <div class="rolagem">
+<table>
     <thead><tr><th>Chave</th><th>Modelo</th><th>Parâmetros</th><th>Tipo</th><th>Identificador</th></tr></thead>
     <tbody>
       {% for chave, m in catalogo.items() %}
@@ -65,11 +176,39 @@ python rodar_treino.py --tarefa motivacao --modelo bertimbau-base --grade 1</pre
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  <dl class="suave" style="margin-top:10px">
+    <dt><strong>Chave</strong></dt>
+    <dd>O nome curto que se passa em <code>--modelo</code> na linha de comando.</dd>
+    <dt><strong>Parâmetros</strong></dt>
+    <dd>
+      O tamanho do modelo. Mais parâmetros costumam dar resultado melhor e custam
+      mais memória e tempo — <code>bertimbau-large</code> é o caso em que a placa
+      de vídeo pode não dar conta, e a falha fica registrada como resultado.
+    </dd>
+    <dt><strong>Tipo</strong></dt>
+    <dd>
+      A família do pré-treino. Todos os {{ catalogo|length }} são
+      <strong>monolíngues de português</strong>, por decisão do trabalho: o
+      corpus é de notícias brasileiras, e um vocabulário treinado em português
+      representa “baleado”, “chacina” ou “milícia” em menos subpalavras que um
+      vocabulário repartido entre cem idiomas. A comparação mede, então, o
+      <strong>tamanho</strong> (100M, 110M e 335M) e as duas famílias
+      disponíveis — BERTimbau e Albertina. Ela não mede se o português ajuda
+      contra um multilíngue: essa pergunta ficou fora do recorte.
+    </dd>
+    <dt><strong>Identificador</strong></dt>
+    <dd>
+      O endereço do modelo no Hugging Face, de onde os pesos são baixados na
+      primeira execução. É o que torna o experimento reproduzível por terceiros.
+    </dd>
+  </dl>
 </div>
 
 <div class="cartao">
   <h2>Grade de hiperparâmetros</h2>
-  <table>
+  <div class="rolagem">
+<table>
     <thead>
       <tr><th>#</th><th>Learning rate</th><th>Batch</th><th>Épocas</th><th>Weight decay</th><th>Max length</th></tr>
     </thead>
@@ -86,12 +225,23 @@ python rodar_treino.py --tarefa motivacao --modelo bertimbau-base --grade 1</pre
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <p class="suave" style="margin-top:10px">
     Os valores ficam na faixa que a literatura de fine-tuning de BERT recomenda
     (learning rate entre 2e-5 e 5e-5, poucas épocas). Corpora pequenos
     sobreajustam rápido, então as configurações com mais épocas usam learning
     rate menor. Com {{ catalogo|length }} modelos e {{ grade|length }}
-    configurações, cada tarefa executa {{ catalogo|length * grade|length }} treinos.
+    configurações, uma comparação completa ajusta
+    {{ catalogo|length * grade|length }} redes em <code>unico</code> e
+    {{ catalogo|length * grade|length * (estatisticas.indicadores|length) }} em
+    <code>por_indicador</code> — é por isso que a comparação entre as duas
+    estratégias costuma rodar com <code>--grade 1</code>.
+  </p>
+  <p class="suave">
+    Duas chaves não aparecem na tabela porque não variam na grade:
+    <code>peso_classes</code> e <code>calibrar_limiar</code>, ligadas por
+    padrão. Elas ficam gravadas nos hiperparâmetros de cada execução, de modo
+    que uma rodada feita com elas desligadas não se confunde com as outras.
   </p>
 </div>
 
@@ -102,52 +252,267 @@ python rodar_treino.py --tarefa motivacao --modelo bertimbau-base --grade 1</pre
     <div>
       {% if treinados[tarefa] %}
         <span class="status status-aprovado">modelo salvo</span>
+        {% if em_producao[tarefa].estrategia %}
+          <span class="etiqueta regra">{{ em_producao[tarefa].estrategia }}</span>
+        {% endif %}
       {% else %}
         <span class="status status-rascunho">sem modelo salvo</span>
       {% endif %}
     </div>
   </div>
 
+  {% if em_producao[tarefa].limiares %}
+  <details style="margin-top:6px">
+    <summary>Limiar de cada indicador no modelo em produção</summary>
+    <div class="rolagem">
+<table style="margin-top:8px">
+      <thead><tr><th>Indicador</th><th>Limiar</th></tr></thead>
+      <tbody>
+        {% for nome, corte in em_producao[tarefa].limiares | dictsort(by='value') %}
+        <tr><td>{{ rotulos[nome] or nome }}</td><td>{{ '%.2f' | format(corte) }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="suave" style="margin-top:8px">
+      Um corte por indicador, escolhido pelo F1 daquele indicador na validação.
+      Corte abaixo de 0,5 é um indicador que o modelo reconhece com pontuação
+      baixa mas na ordem certa: sem a calibração ele nunca apareceria.
+    </p>
+  </details>
+  {% endif %}
+
   {% set prontidao = estatisticas.prontidao[tarefa] %}
   {% if not prontidao.pode_treinar %}
     <p class="aviso aviso-aviso">
       Ainda não é possível treinar: {{ prontidao.motivo }}.
-      <a href="{{ url_for('corpus_repositorio') }}">Rotular notícias no corpus</a>.
+      <a href="{{ url_for('fila_recebidas') }}">Rotular na fila de recebidas</a>
+      ou <a href="{{ url_for('corpus_repositorio') }}">no corpus</a>.
+      {% if estatisticas.rotuladas_sem_aprovar %}
+        <br><strong>{{ estatisticas.rotuladas_sem_aprovar }} notícia(s) rotuladas
+        esperando revisão</strong> —
+        <a href="{{ url_for('corpus_repositorio', aprovada='esperando') }}">aprovar
+        o que já está certo</a> pode ser o bastante, porque só o aprovado conta.
+      {% endif %}
+      {% if prontidao.prontas %}
+        <br>Classes que já alcançaram o mínimo:
+        {% for n in prontidao.prontas %}<code>{{ n }}</code>{{ ', ' if not loop.last }}{% endfor %}.
+        Dá para treinar só elas pela linha de comando:
+        <code>python rodar_treino.py {% for n in prontidao.prontas %}--classe {{ n }} {% endfor %}</code>
+      {% endif %}
     </p>
   {% elif prontidao.motivo != 'ok' %}
     <p class="aviso aviso-aviso">{{ prontidao.motivo }}.</p>
   {% endif %}
 
+  {% if tarefa == 'indicadores' %}
+  <div class="cartao">
+    <h3 style="margin-top:0">Treinar</h3>
+    {% if treino.rodando %}
+      <p class="aviso aviso-ok">
+        Treino em andamento (processo {{ treino.pid }}). Pode fechar esta
+        página — ele não para junto. Recarregue para ver o progresso.
+      </p>
+    {% else %}
+      <p class="suave" style="margin-top:0">
+        O treino roda em segundo plano e leva minutos. Ele usa TODAS as notícias
+        rotuladas do corpus de uma vez — não existe treinar "só a classe que
+        acabei de marcar": rotular acumula exemplos, treinar reconstrói o
+        modelo a partir de todos eles.
+      </p>
+      <form method="post" action="{{ url_for('treinar_modelo') }}">
+        <div class="linha">
+          <div>
+            <label for="estrategia">Estratégia</label>
+            <select id="estrategia" name="estrategia">
+              {% for valor, rotulo in estrategias.items() %}
+                <option value="{{ valor }}">{{ valor }} — {{ rotulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="dispositivo">Onde rodar</label>
+            <select id="dispositivo" name="dispositivo">
+              <option value="auto">auto ({{ ambiente.dispositivo }})</option>
+              <option value="cuda">placa de vídeo</option>
+              <option value="cpu">processador</option>
+            </select>
+          </div>
+          <div>
+            <label for="grade">Configurações por modelo</label>
+            <input id="grade" name="grade" type="number" min="1"
+                   max="{{ grade|length }}" value="1">
+          </div>
+        </div>
+        <label>Modelos a comparar (nenhum marcado = todos)</label>
+        <div class="grade-indicadores">
+          {% for chave, m in catalogo.items() %}
+            <label class="caixa">
+              <span class="cabeca">
+                <input type="checkbox" name="modelos" value="{{ chave }}">
+                {{ m.rotulo }}
+              </span>
+              <span class="suave">{{ m.parametros }} · {{ m.tipo }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <label class="caixa" style="margin-top:8px">
+          <span class="cabeca">
+            <input type="checkbox" name="dividir">
+            REFAZER a divisão do zero
+          </span>
+          <span class="suave">
+            Deixe desmarcado no uso normal. O que está sem partição já é
+            distribuído automaticamente antes de treinar, e o que foi sorteado
+            fica onde está. Marcar isto resorteia TUDO: o conjunto de teste
+            muda e as execuções anteriores deixam de ser comparáveis com esta.
+          </span>
+        </label>
+        <button type="submit" {% if not prontidao.pode_treinar %}disabled{% endif %}>
+          Treinar agora
+        </button>
+      </form>
+    {% endif %}
+
+    {% if treino.tem_registro %}
+      <details {% if treino.rodando %}open{% endif %} style="margin-top:10px">
+        <summary>Registro do treino</summary>
+        <pre class="suave" style="white-space:pre-wrap;max-height:320px;overflow:auto">{% for linha in treino.registro %}{{ linha }}
+{% endfor %}</pre>
+      </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% set lista = execucoes[tarefa] | selectattr('metricas') | selectattr('metricas.f1_macro', 'defined') | list %}
   {% set falhas = execucoes[tarefa] | selectattr('erro') | list %}
 
-  {% if not lista %}
+  {% set linhas_placar = placar[tarefa] %}
+  {% if not linhas_placar %}
     <p class="suave">Nenhuma execução concluída para esta tarefa.</p>
   {% else %}
-  {% set melhor = (lista | sort(attribute='metricas.f1_macro') | last) %}
+  {# O melhor é o primeiro do placar, que ordena pelo F1 na VALIDAÇÃO — o mesmo
+     critério que decide os pesos salvos. Ordenar pelo teste aqui marcaria como
+     "melhor" uma linha diferente da que está em produção. #}
+  {% set melhor = linhas_placar[0].execucao %}
+
+  <h3>Placar: a melhor configuração de cada modelo</h3>
+  <p class="suave">
+    A tabela completa, mais abaixo, tem uma linha por execução — com
+    {{ catalogo|length }} modelos e {{ grade|length }} configurações são
+    {{ catalogo|length * grade|length }} linhas por estratégia. Esta reduz a uma
+    linha por modelo: a melhor configuração dele.
+  </p>
   <div style="overflow-x:auto">
-    <table>
+    <div class="rolagem">
+<table>
       <thead>
         <tr>
-          <th>Modelo</th><th>lr</th><th>bs</th><th>ep</th>
-          <th>Acurácia</th><th>Precisão macro</th><th>Recall macro</th><th>F1 macro</th>
+          <th>#</th><th>Estratégia</th><th>Modelo</th><th>Parâmetros</th>
+          <th>F1 macro (teste)</th>
+          <th title="O critério de escolha: é por este número que o vencedor é decidido">F1 validação</th>
+          <th title="Média de indicadores marcados por notícia, contra a do gabarito">Marcados/notícia</th>
+          <th>Execuções</th><th>Tempo</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linha in linhas_placar %}
+        {% set e = linha.execucao %}
+        {% set marcacoes = e.metricas.get('marcacoes_por_noticia') or {} %}
+        <tr {% if loop.first %}class="melhor-linha"{% endif %}>
+          <td>{{ loop.index }}</td>
+          <td><code>{{ linha.estrategia }}</code></td>
+          <td>
+            <strong>{{ catalogo.get(linha.modelo, {}).get('rotulo', linha.modelo) }}</strong>
+            {% if loop.first %}<span class="etiqueta regra">melhor</span>{% endif %}
+            {% if em_producao[tarefa].modelo == linha.modelo
+                  and em_producao[tarefa].estrategia == linha.estrategia %}
+              <span class="etiqueta texto">em produção</span>
+            {% endif %}
+          </td>
+          <td class="suave">{{ catalogo.get(linha.modelo, {}).get('parametros', '—') }}</td>
+          <td><strong>{{ metrica(e.metricas.f1_macro) }}</strong></td>
+          <td>
+            {{ metrica(e.metricas.get('f1_macro_validacao_final')) }}
+            {% if 'teste' in linha.criterio %}
+              <span class="sem-suporte" title="Não havia validação: a escolha caiu para o próprio teste">!</span>
+            {% endif %}
+          </td>
+          <td class="suave">
+            {% if marcacoes.get('media_prevista') is not none %}
+              {{ '%.2f' | format(marcacoes.media_prevista) }}
+              <span style="opacity:.6">/ {{ '%.2f' | format(marcacoes.media_verdadeira) }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="suave">{{ linha.n_execucoes }}</td>
+          <td class="suave">{{ '%.0f' | format(e.duracao_s) }}s</td>
+          <td><a href="{{ url_for('modelo_execucao', execucao_id=e.id) }}">matriz</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <p class="suave" style="margin-top:10px">
+    A ordem é dada pelo <strong>F1 macro na validação</strong>, que é o mesmo
+    critério com que o treino decide quais pesos gravar — por isso a primeira
+    linha é a que foi para produção, e não a de maior F1 no teste. Ordenar por
+    teste aqui transformaria o conjunto de teste em critério de escolha, que é
+    exatamente o que ele não pode ser.
+    {% if em_producao[tarefa].treinado_em %}
+      O modelo em produção foi treinado em
+      {{ em_producao[tarefa].treinado_em[:16].replace('T', ' ') }}.
+    {% endif %}
+  </p>
+  {% if linhas_placar | length > 1 %}
+  <p class="suave">
+    Com mais de um modelo no placar, a leitura que interessa ao trabalho não é só
+    quem ganhou: é <em>por quanto</em>. Diferença de poucos milésimos entre dois
+    modelos, num corpus desta ordem, não sustenta afirmação de superioridade —
+    repita a execução vencedora com outras sementes antes de afirmá-la.
+  </p>
+  {% endif %}
+
+  <h3 style="margin-top:18px">Todas as execuções</h3>
+  <div style="overflow-x:auto">
+    <div class="rolagem">
+<table>
+      <thead>
+        <tr>
+          <th>Estratégia</th><th>Modelo</th>
+          <th title="Quantas redes a execução ajustou">Redes</th>
+          <th>lr</th><th>bs</th><th>ep</th>
+          <th title="Exige acertar a combinação inteira de indicadores da notícia">Acurácia subconj.</th>
+          <th>Precisão macro</th><th>Recall macro</th><th>F1 macro</th>
+          <th title="O MESMO modelo com todos os cortes em 0,5, para medir o efeito da calibração">F1 em 0,5</th>
+          <th title="Média de indicadores marcados por notícia do teste">Marcados/notícia</th>
           <th>F1 validação</th><th>Tempo</th><th>Disp.</th><th></th>
         </tr>
       </thead>
       <tbody>
         {% for e in lista | sort(attribute='metricas.f1_macro', reverse=true) %}
+        {% set marcacoes = e.metricas.get('marcacoes_por_noticia') or {} %}
         <tr {% if e.id == melhor.id %}class="melhor-linha"{% endif %}>
+          <td><code>{{ e.estrategia or 'unico' }}</code></td>
           <td>
             <strong>{{ catalogo.get(e.modelo, {}).get('rotulo', e.modelo) }}</strong>
             {% if e.id == melhor.id %}<span class="etiqueta regra">melhor</span>{% endif %}
           </td>
+          <td class="suave">{{ e.n_redes or 1 }}</td>
           <td>{{ '%.0e' | format(e.hiperparametros.learning_rate) }}</td>
           <td>{{ e.hiperparametros.batch_size }}</td>
           <td>{{ e.hiperparametros.epocas }}</td>
-          <td>{{ metrica(e.metricas.get('acuracia', e.metricas.get('acuracia_subconjunto'))) }}</td>
+          <td>{{ metrica(e.metricas.get('acuracia_subconjunto')) }}</td>
           <td>{{ metrica(e.metricas.precisao_macro) }}</td>
           <td>{{ metrica(e.metricas.recall_macro) }}</td>
           <td><strong>{{ metrica(e.metricas.f1_macro) }}</strong></td>
+          <td class="suave">{{ metrica((e.metricas.get('sem_calibracao') or {}).get('f1_macro')) }}</td>
+          <td class="suave">
+            {% if marcacoes.get('media_prevista') is not none %}
+              {{ '%.2f' | format(marcacoes.media_prevista) }}
+              <span style="opacity:.6">/ {{ '%.2f' | format(marcacoes.media_verdadeira) }}</span>
+            {% else %}—{% endif %}
+          </td>
           <td class="suave">{{ metrica(e.metricas.get('f1_macro_validacao_final')) }}</td>
           <td class="suave">{{ '%.0f' | format(e.duracao_s) }}s</td>
           <td class="suave">{{ e.dispositivo }}</td>
@@ -156,24 +521,43 @@ python rodar_treino.py --tarefa motivacao --modelo bertimbau-base --grade 1</pre
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   <p class="suave" style="margin-top:10px">
     {{ lista|length }} execução(ões) · treino {{ melhor.n_treino }} /
     validação {{ melhor.n_validacao }} / teste {{ melhor.n_teste }} exemplos.
-    O F1 macro dá o mesmo peso a cada classe, então uma categoria rara mal
-    classificada aparece — a acurácia sozinha engana num corpus desbalanceado,
-    onde chutar sempre a classe maior já acerta muito.
+    Esta tabela está ordenada pelo F1 macro no <strong>teste</strong>, para
+    mostrar o desempenho medido; a etiqueta <em>melhor</em> continua na execução
+    escolhida pela <strong>validação</strong>, que é a que foi para produção. Se
+    as duas não coincidem, isso é informação: quer dizer que a configuração com
+    melhor número no teste não era a que a validação apontava, e adotá-la seria
+    escolher pelo teste.
+    O F1 macro dá o mesmo peso a cada indicador, então um indicador raro mal
+    classificado aparece. A acurácia de subconjunto exige acertar a combinação
+    inteira de indicadores de uma notícia: é severa em multirrótulo e serve de
+    referência, não como o número principal.
+  </p>
+  <p class="suave">
+    <strong>F1 em 0,5</strong> é o mesmo modelo, a mesma partição de teste, com
+    todos os cortes fixados em 0,5: a diferença entre essa coluna e o F1 macro é
+    o efeito medido da calibração, não uma afirmação de que ela ajuda.
+    <strong>Marcados/notícia</strong> traz a média de indicadores que o modelo
+    marcou e, ao lado, a que o gabarito pedia — é a leitura direta de "ele está
+    marcando vários?". Modelo em 0,9 contra gabarito em 1,8 está marcando de
+    menos, e quase sempre por causa do corte, não do que aprendeu.
   </p>
   {% endif %}
 
   {% if falhas %}
   <details style="margin-top:10px">
     <summary>{{ falhas|length }} execução(ões) que falharam</summary>
-    <table>
-      <thead><tr><th>Modelo</th><th>Hiperparâmetros</th><th>Erro</th></tr></thead>
+    <div class="rolagem">
+<table>
+      <thead><tr><th>Estratégia</th><th>Modelo</th><th>Hiperparâmetros</th><th>Erro</th></tr></thead>
       <tbody>
         {% for f in falhas %}
         <tr>
+          <td><code>{{ f.estrategia or 'unico' }}</code></td>
           <td>{{ f.modelo }}</td>
           <td class="suave">lr={{ f.hiperparametros.learning_rate }} bs={{ f.hiperparametros.batch_size }}</td>
           <td class="suave">{{ f.erro[:160] }}</td>
@@ -181,6 +565,7 @@ python rodar_treino.py --tarefa motivacao --modelo bertimbau-base --grade 1</pre
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </details>
   {% endif %}
 </div>

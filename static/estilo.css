@@ -1,133 +1,455 @@
+/* Identidade visual do Fogo Cruzado, extraída de docs/logo.pdf.
+   -------------------------------------------------------------------------
+   A paleta é a do material publicado: laranja de terracota como acento,
+   grafite como texto e superfície escura, areia como realce claro e uma
+   escada de cinzas neutros. Os valores saíram dos próprios vetores do PDF,
+   não de amostragem de tela.
+
+   A barra superior é grafite com o logotipo em branco, e não laranja como no
+   relatório impresso: aqui ela fica visível o dia inteiro, e uma faixa laranja
+   de ponta a ponta cansa. O laranja carrega a identidade onde ele decide algo
+   — ação principal, item ativo, foco.
+
+   PENSADA PARA O CELULAR PRIMEIRO. Antes não havia uma única media query: a
+   tabela estourava a tela, os botões tinham 30px de altura e a navegação de
+   onze itens quebrava em quatro linhas. */
+
 :root {
-  --fundo: #f4f5f7;
-  --cartao: #ffffff;
-  --borda: #d8dce3;
-  --texto: #1f2430;
-  --suave: #626a7a;
-  --acento: #1f5fa8;
-  --laranja: #c2601a;
-  --vermelho: #b3261e;
-  --verde: #1e7a46;
+  /* Marca */
+  --laranja: #E0733D;
+  --laranja-escuro: #C65F2C;
+  --laranja-claro: #FDF1EB;
+  --grafite: #2D3637;
+  --grafite-fundo: #1E2425;
+
+  /* Neutros, do mais claro ao mais escuro */
+  --fundo: #F6F7F7;
+  --cartao: #FFFFFF;
+  --borda: #E3E5E6;
+  --borda-forte: #D5D8D9;
+  --texto: #2D3637;
+  --suave: #6B7678;
+
+  /* Semânticos: usados para estado, nunca para decorar */
+  --vermelho: #B3261E;
+  --vermelho-claro: #FBE9E8;
+  --verde: #1E7A46;
+  --verde-claro: #E6F3EC;
+  --azul: #4285F4;
+  --azul-claro: #E8EFFD;
+
+  --sombra: 0 1px 2px rgba(45, 54, 55, .06), 0 2px 8px rgba(45, 54, 55, .05);
+  --sombra-alta: 0 8px 24px rgba(45, 54, 55, .16);
+  --curva: 10px;
+  --toque: 44px; /* alvo mínimo de toque, recomendação de acessibilidade */
 }
 
 * { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 15px;
+  line-height: 1.55;
   color: var(--texto);
   background: var(--fundo);
+  -webkit-font-smoothing: antialiased;
 }
 
-a { color: var(--acento); }
+a { color: var(--laranja-escuro); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--laranja); }
+
+/* ------------------------------------------------------------------ topo -- */
 
 .topo {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--grafite);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .06), var(--sombra);
+}
+
+.topo-interno {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  padding: 12px 24px;
-  background: #14243c;
-  color: #fff;
+  gap: 12px 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 10px 16px;
 }
 
-.topo .marca { font-weight: 600; color: #fff; text-decoration: none; margin-right: 12px; }
-.topo nav { display: flex; gap: 14px; flex: 1; }
-.topo nav a { color: #c8d4e4; text-decoration: none; padding: 4px 0; }
-.topo nav a:hover { color: #fff; border-bottom: 2px solid #fff; }
-.topo .analista { display: flex; gap: 6px; }
-.topo .analista input { width: 170px; }
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+/* O logotipo entra por MÁSCARA, não embutido no HTML. Embutido, os 25 KB do
+   traçado viajariam em cada página; como máscara, o arquivo é buscado uma vez,
+   fica em cache, e a cor ainda vem do CSS — `background-color` pinta o que a
+   máscara deixa passar. */
+.marca .logotipo {
+  display: block;
+  width: 156px;            /* 22px de altura x 7.09 de proporção do traçado */
+  height: 22px;
+  flex-shrink: 0;
+  background-color: #fff;
+  -webkit-mask: url("logo-fogocruzado.svg") no-repeat center / contain;
+  mask: url("logo-fogocruzado.svg") no-repeat center / contain;
+  transition: background-color .12s ease;
+}
+.marca:hover .logotipo { background-color: var(--laranja); }
+.marca .marca-sub {
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #A8B0B1;
+  border-left: 1px solid #4A5456;
+  padding-left: 10px;
+  white-space: nowrap;
+}
 
-main { max-width: 1060px; margin: 0 auto; padding: 24px; }
+/* A navegação rola na horizontal quando não cabe, em vez de quebrar em quatro
+   linhas e empurrar o conteúdo da página para baixo da dobra. */
+.topo nav {
+  display: flex;
+  gap: 2px;
+  flex: 1 1 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.topo nav::-webkit-scrollbar { height: 3px; }
+.topo nav::-webkit-scrollbar-thumb { background: #4A5456; border-radius: 3px; }
 
-h1 { font-size: 22px; margin: 0 0 4px; }
+.topo nav a {
+  color: #C9CFD0;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+}
+.topo nav a:hover { color: #fff; background: rgba(255, 255, 255, .07); }
+.topo nav a.ativa {
+  color: #fff;
+  border-bottom-color: var(--laranja);
+  background: rgba(224, 115, 61, .14);
+}
+
+.contador {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  margin-left: 5px;
+  border-radius: 999px;
+  background: var(--laranja);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.topo .analista { display: flex; gap: 6px; flex-shrink: 0; }
+.topo .analista input {
+  width: 150px;
+  background: rgba(255, 255, 255, .1);
+  border-color: #4A5456;
+  color: #fff;
+}
+.topo .analista input::placeholder { color: #98A1A2; }
+.topo .analista input:focus { background: rgba(255, 255, 255, .16); }
+
+/* --------------------------------------------------------------- ajuda --
+   O botão vive na barra escura, e por isso é desenhado em contorno claro em
+   vez de herdar o botão padrão — preenchido ali ele competiria com o item
+   ativo da navegação, que é o laranja. */
+.botao-ajuda {
+  background: transparent;
+  color: #fff;
+  border: 1px solid #4A5456;
+  flex-shrink: 0;
+}
+.botao-ajuda:hover { background: rgba(255, 255, 255, .12); border-color: #6B7678; }
+
+/* O painel é um <dialog> de verdade: o navegador dá o fundo escuro, o fechar
+   com Esc e o foco preso dentro, sem script para nada disso. */
+dialog.ajuda {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(86vh, 900px);
+  padding: 0;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .22);
+  color: var(--texto);
+  background: var(--cartao);
+}
+dialog.ajuda::backdrop { background: rgba(30, 36, 37, .55); }
+
+/* O topo fica preso: num painel de três telas de rolagem, o botão de fechar
+   não pode ficar lá em cima inalcançável. */
+.ajuda-topo {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 14px;
+  background: var(--cartao);
+  border-bottom: 1px solid var(--borda);
+}
+.ajuda-topo h2 { margin: 0 0 4px; font-size: 19px; }
+.ajuda-topo p { margin: 0; max-width: 52ch; }
+
+.ajuda-corpo { padding: 6px 22px 24px; overflow-y: auto; }
+.ajuda-corpo h3 {
+  margin: 22px 0 10px;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--laranja-escuro);
+}
+.ajuda-corpo p { max-width: 68ch; line-height: 1.6; }
+
+.ajuda-secao { margin-bottom: 14px; }
+.ajuda-secao h4 { margin: 0 0 3px; font-size: 15px; }
+.ajuda-secao p { margin: 0; color: var(--texto); }
+
+/* O glossário em duas colunas: o termo à esquerda, a explicação à direita.
+   Numa lista corrida, termo e texto se misturam e deixa de dar para varrer
+   com o olho procurando a sigla. */
+.ajuda-glossario { margin: 0; display: grid; grid-template-columns: 170px 1fr; gap: 10px 18px; }
+.ajuda-glossario dt { font-weight: 700; font-size: 14px; }
+.ajuda-glossario dd { margin: 0; color: var(--texto); line-height: 1.55; }
+
+main { max-width: 1180px; margin: 0 auto; padding: 22px 16px 64px; }
+
+/* ----------------------------------------------------------- tipografia -- */
+
+h1 { font-size: 24px; line-height: 1.25; margin: 0 0 6px; letter-spacing: -.01em; }
 h2 { font-size: 17px; margin: 0 0 12px; }
 h3 { font-size: 15px; margin: 0 0 8px; }
+
+/* O quadradinho laranja antes do título de seção é a assinatura do material
+   publicado; é ele que faz a tela parecer do mesmo lugar que o relatório. */
+.cartao > h2:first-child::before,
+.cartao > h3:first-child::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--laranja);
+  vertical-align: baseline;
+}
 
 .cartao {
   background: var(--cartao);
   border: 1px solid var(--borda);
-  border-radius: 8px;
+  border-radius: var(--curva);
   padding: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--sombra);
 }
+
+/* ------------------------------------------------------------ formulário -- */
 
 input, select, textarea, button {
   font: inherit;
-  padding: 7px 9px;
-  border: 1px solid var(--borda);
-  border-radius: 5px;
+  padding: 9px 11px;
+  border: 1px solid var(--borda-forte);
+  border-radius: 7px;
   background: #fff;
   color: var(--texto);
+  min-height: var(--toque);
+}
+input, select, textarea { width: 100%; }
+input[type="checkbox"], input[type="radio"] {
+  width: auto;
+  min-height: 0;
+  accent-color: var(--laranja);
+  width: 17px;
+  height: 17px;
 }
 
-textarea { width: 100%; resize: vertical; }
-label { display: block; font-size: 13px; color: var(--suave); margin-bottom: 4px; }
+:focus-visible {
+  outline: 2px solid var(--laranja);
+  outline-offset: 2px;
+}
 
-button {
-  background: var(--acento);
-  border-color: var(--acento);
+textarea { resize: vertical; min-height: 96px; }
+label { display: block; font-size: 13px; font-weight: 600; color: var(--suave); margin-bottom: 5px; }
+
+/* ---------------------------------------------------------------- botões -- */
+
+/* Três níveis e nada além: principal (laranja cheio), secundário (contorno) e
+   perigo. Antes todo botão era azul cheio, inclusive "Excluir" — a tela não
+   dizia qual era a ação principal de cada formulário. */
+button, .botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--laranja);
+  border: 1px solid var(--laranja);
   color: #fff;
+  font-weight: 600;
   cursor: pointer;
+  width: auto;
+  text-decoration: none;
+  transition: background .12s ease, border-color .12s ease;
 }
-button:hover { filter: brightness(1.1); }
-button.secundario { background: #fff; color: var(--texto); border-color: var(--borda); }
-button.perigo { background: #fff; color: var(--vermelho); border-color: #e2b6b3; }
+button:hover, .botao:hover { background: var(--laranja-escuro); border-color: var(--laranja-escuro); color: #fff; }
+button:active, .botao:active { transform: translateY(1px); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+button.secundario, .botao.secundario {
+  background: #fff;
+  color: var(--texto);
+  border-color: var(--borda-forte);
+}
+button.secundario:hover, .botao.secundario:hover { background: var(--fundo); border-color: var(--suave); color: var(--texto); }
+
+button.perigo {
+  background: #fff;
+  color: var(--vermelho);
+  border-color: #E8C5C3;
+}
+button.perigo:hover { background: var(--vermelho); border-color: var(--vermelho); color: #fff; }
+
+button.pequeno, .botao.pequeno {
+  padding: 5px 10px;
+  font-size: 13px;
+  min-height: 34px;
+}
+
+/* Barra de ações no rodapé de um formulário: a principal à esquerda, as
+   demais ao lado, e tudo empilha no celular. */
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+}
+.acoes .espaco { flex: 1; }
 
 .linha { display: flex; flex-wrap: wrap; gap: 12px; }
-.linha > div { flex: 1; min-width: 150px; }
+.linha > div { flex: 1; min-width: 160px; }
+
+/* --------------------------------------------------------------- tabelas -- */
+
+/* A tabela rola sozinha dentro do cartão em vez de esticar a página inteira:
+   no celular era o que fazia o texto todo encolher. */
+.rolagem { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -18px; padding: 0 18px; }
 
 table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borda); vertical-align: top; }
-th { font-size: 13px; color: var(--suave); font-weight: 600; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+th {
+  font-size: 12px;
+  color: var(--suave);
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--borda-forte);
+}
+tbody tr:hover { background: var(--fundo); }
+tbody tr:last-child td { border-bottom: 0; }
+
+/* -------------------------------------------------------- etiqueta e selo -- */
 
 .etiqueta {
   display: inline-block;
   font-size: 12px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
-  background: #e8edf5;
-  color: #29456f;
+  background: var(--laranja-claro);
+  color: var(--laranja-escuro);
   margin: 1px 2px 1px 0;
 }
-.etiqueta.regra { background: #e4f1e9; color: var(--verde); }
-.etiqueta.texto { background: #eae6f5; color: #513a99; }
+.etiqueta.regra { background: var(--verde-claro); color: var(--verde); }
+.etiqueta.texto { background: var(--azul-claro); color: #1A56C4; }
 
-.status { font-size: 12px; padding: 2px 9px; border-radius: 999px; font-weight: 600; }
-.status-rascunho { background: #eceef2; color: var(--suave); }
-.status-nao_aprovado { background: #fbead3; color: var(--laranja); }
-.status-aprovado { background: #e0f0e7; color: var(--verde); }
-.status-unificada { background: #e8edf5; color: var(--suave); }
+.status { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+.status-rascunho { background: #ECEEEE; color: var(--suave); }
+.status-nao_aprovado { background: var(--laranja-claro); color: var(--laranja-escuro); }
+.status-aprovado { background: var(--verde-claro); color: var(--verde); }
+.status-unificada { background: #ECEEEE; color: var(--suave); }
 
-.aviso { padding: 10px 14px; border-radius: 6px; border: 1px solid; margin-bottom: 14px; }
-.aviso-ok { background: #e6f3ec; border-color: #b6dcc6; color: #14522f; }
-.aviso-erro { background: #fbe9e8; border-color: #eec2bf; color: #7d1a15; }
-.aviso-aviso { background: #fdf3e2; border-color: #f0d6a8; color: #7d4a0f; }
+/* ---------------------------------------------------------------- avisos -- */
+
+.aviso {
+  padding: 11px 14px;
+  border-radius: 8px;
+  border: 1px solid;
+  border-left-width: 3px;
+  margin-bottom: 14px;
+}
+.aviso-ok { background: var(--verde-claro); border-color: #B6DCC6; color: #14522F; }
+.aviso-erro { background: var(--vermelho-claro); border-color: #EEC2BF; color: #7D1A15; }
+.aviso-aviso { background: var(--laranja-claro); border-color: #F4CDB5; color: #8A4418; }
+
+/* AS TRÊS FAIXAS DE CONCORDÂNCIA DO CLASSIFICADOR.
+   A cor é a primeira coisa que se vê na fila, e é ela que diz o que fazer:
+   vermelho pede revisão, laranja pede verificação, verde já pode seguir. */
+.faixa-revisao  { border-left: 4px solid var(--vermelho); }
+.faixa-alerta   { border-left: 4px solid var(--laranja); }
+.faixa-ok       { border-left: 4px solid var(--verde); }
+.faixa-fila     { border-left: 4px solid var(--borda-forte); }
+.faixa-conferida{ border-left: 4px solid var(--suave); }
+.faixa-pronta   { border-left: 4px solid var(--azul); }
+
+.selo { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+.selo-revisao   { background: var(--vermelho-claro); color: var(--vermelho); }
+.selo-alerta    { background: var(--laranja-claro); color: var(--laranja-escuro); }
+.selo-ok        { background: var(--verde-claro); color: var(--verde); }
+.selo-fila      { background: #ECEEEE; color: var(--suave); }
+.selo-conferida { background: #ECEEEE; color: var(--suave); }
+.selo-pronta    { background: var(--azul-claro); color: #1A56C4; }
+
+/* ---------------------------------------------------------------- texto -- */
 
 .suave { color: var(--suave); font-size: 13px; }
 .direita { text-align: right; }
-.entre { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.entre { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 .proposta {
-  background: #fdf3e2;
-  border: 1px solid #f0d6a8;
-  border-radius: 6px;
-  padding: 8px 10px;
+  background: var(--laranja-claro);
+  border: 1px solid #F4CDB5;
+  border-radius: 8px;
+  padding: 9px 11px;
   margin-top: 8px;
   font-size: 13px;
 }
 
-details > summary { cursor: pointer; color: var(--acento); font-size: 13px; }
+details > summary {
+  cursor: pointer;
+  color: var(--laranja-escuro);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 0;
+  min-height: 32px;
+}
 details[open] > summary { margin-bottom: 10px; }
 
 .noticia-texto {
   white-space: pre-wrap;
-  background: #f7f8fa;
+  background: var(--fundo);
   border: 1px solid var(--borda);
-  border-radius: 6px;
-  padding: 10px;
-  max-height: 220px;
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 260px;
   overflow: auto;
   font-size: 13px;
 }
@@ -135,96 +457,192 @@ details[open] > summary { margin-bottom: 10px; }
 .passos { list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--suave); }
 .passos li { padding: 3px 0; }
 
-.paginacao { display: flex; justify-content: space-between; align-items: center; }
+.paginacao { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-/* Corpus, modelos e playground */
+/* --------------------------------------- corpus, modelos e playground -- */
 
 .indicador-caixa {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--borda);
-  border-radius: 7px;
-  background: #fbfcfd;
+  border-radius: 9px;
+  background: var(--cartao);
 }
-.indicador-caixa .numero { font-size: 24px; font-weight: 600; }
+.indicador-caixa .numero { font-size: 26px; font-weight: 700; line-height: 1.1; }
 
-.barra {
-  flex: 1;
-  height: 8px;
-  background: #e8ebf0;
-  border-radius: 999px;
-  overflow: hidden;
-  min-width: 60px;
-}
-.barra-preenchida { display: block; height: 100%; background: var(--acento); }
+.barra { flex: 1; height: 8px; background: var(--borda); border-radius: 999px; overflow: hidden; min-width: 60px; }
+.barra-preenchida { display: block; height: 100%; background: var(--laranja); }
 .barra-preenchida.regra { background: var(--verde); }
 
 label.caixa {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   font-size: 13px;
+  font-weight: 400;
   color: var(--texto);
-  border: 1px solid var(--borda);
-  border-radius: 6px;
-  padding: 8px 10px;
+  border: 1px solid var(--borda-forte);
+  border-radius: 8px;
+  padding: 11px 13px;
   background: #fff;
   cursor: pointer;
   margin-bottom: 0;
+  min-height: var(--toque);
 }
-label.caixa:hover { border-color: var(--acento); }
-label.caixa.escolhida { border-color: var(--acento); background: #eef4fb; }
-.escolha-grande label.caixa { font-size: 14px; padding: 12px 16px; }
+label.caixa:hover { border-color: var(--laranja); }
+label.caixa.escolhida { border-color: var(--laranja); background: var(--laranja-claro); }
+label.caixa .cabeca { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.escolha-grande label.caixa { font-size: 14px; padding: 14px 16px; }
 
 pre.comando {
-  background: #14243c;
-  color: #dbe6f5;
+  background: var(--grafite-fundo);
+  color: #D7DBDC;
   padding: 14px 16px;
-  border-radius: 7px;
+  border-radius: 8px;
   overflow-x: auto;
   font-size: 13px;
   line-height: 1.6;
   margin: 0;
 }
 
-code {
-  background: #eceef2;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 13px;
-}
+code { background: #ECEEEE; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
 
-tr.melhor-linha { background: #f0f7f3; }
+tr.melhor-linha { background: var(--verde-claro); }
 .sem-suporte { color: var(--vermelho); }
 
 table.matriz th { font-size: 12px; white-space: nowrap; }
 table.matriz td.celula {
   text-align: center;
   font-variant-numeric: tabular-nums;
-  /* O tom cresce com a contagem, para a diagonal salta ao olho */
-  background: color-mix(in srgb, var(--acento) calc(var(--intensidade, 0) * 55%), #fff);
+  /* O tom cresce com a contagem, para a diagonal saltar ao olho */
+  background: color-mix(in srgb, var(--laranja) calc(var(--intensidade, 0) * 55%), #fff);
 }
 table.matriz td.celula.diagonal {
   background: color-mix(in srgb, var(--verde) calc(var(--intensidade, 0) * 55%), #fff);
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.abas { gap: 4px; border-bottom: 1px solid var(--borda); margin-bottom: 14px; }
+.abas { display: flex; gap: 2px; border-bottom: 1px solid var(--borda-forte); margin-bottom: 14px; overflow-x: auto; }
 .aba {
-  padding: 8px 12px;
+  padding: 10px 14px;
   text-decoration: none;
   color: var(--suave);
   border-bottom: 2px solid transparent;
-  font-size: 13px;
+  font-size: 14px;
+  white-space: nowrap;
+  font-weight: 600;
 }
-.aba.ativa { color: var(--acento); border-bottom-color: var(--acento); font-weight: 600; }
+.aba:hover { color: var(--texto); }
+.aba.ativa { color: var(--laranja-escuro); border-bottom-color: var(--laranja); }
 
-.previsao { font-size: 20px; font-weight: 600; margin: 6px 0; }
+.previsao { font-size: 21px; font-weight: 700; margin: 6px 0; }
 .previsao .suave { font-size: 13px; font-weight: 400; }
 
-.confianca-linha { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+.confianca-linha { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
 .confianca-nome { width: 230px; font-size: 13px; color: var(--suave); }
 .confianca-nome.forte { color: var(--texto); font-weight: 600; }
 .confianca-valor { width: 50px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* Grade dos indicadores: multirrótulo, então são caixas de marcação lado a
+   lado, nunca uma lista de escolha única. */
+.grade-indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+.grade-indicadores label.caixa { height: 100%; }
+
+/* Balão de ajuda: aparece ao passar o mouse e some sozinho. Serve para pôr o
+   código ao lado do botão sem empurrar o formulário para baixo. */
+.com-balao { position: relative; display: inline-block; }
+.com-balao .balao {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: min(640px, 80vw);
+  padding: 12px 14px;
+  background: var(--grafite-fundo);
+  color: #D7DBDC;
+  border-radius: 8px;
+  box-shadow: var(--sombra-alta);
+  font-size: 12px;
+  line-height: 1.55;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .12s ease;
+}
+.com-balao:hover .balao,
+.com-balao:focus-within .balao { opacity: 1; visibility: visible; }
+.com-balao .balao pre { margin: 0; white-space: pre; overflow-x: auto; }
+.com-balao .balao .titulo-balao { display: block; color: var(--laranja); font-weight: 700; margin-bottom: 8px; }
+.com-balao .balao::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 24px;
+  border: 7px solid transparent;
+  border-top-color: var(--grafite-fundo);
+}
+
+/* ------------------------------------------------------------- celular -- */
+
+@media (max-width: 760px) {
+  body { font-size: 16px; } /* abaixo de 16px o iOS dá zoom ao focar um campo */
+  main { padding: 16px 12px 56px; }
+  .cartao { padding: 14px; border-radius: 9px; }
+  .rolagem { margin: 0 -14px; padding: 0 14px; }
+  h1 { font-size: 21px; }
+
+  .topo-interno { padding: 8px 12px; gap: 8px 12px; }
+  .marca .marca-sub { display: none; }
+  .topo .analista { flex: 1 1 100%; }
+  .topo .analista input { width: 100%; }
+
+  /* O formulário em coluna: campo lado a lado em tela estreita obriga a
+     digitar em caixa de 90px. */
+  .linha { flex-direction: column; gap: 10px; }
+  .linha > div { min-width: 0; width: 100%; }
+
+  /* Ação principal ocupando a largura: é o alvo mais fácil de acertar com o
+     polegar, e deixa claro qual é a ação da tela. */
+  .acoes { flex-direction: column; align-items: stretch; }
+  .acoes button, .acoes .botao { width: 100%; }
+  .acoes .espaco { display: none; }
+
+  .grade-indicadores { grid-template-columns: 1fr; }
+  .confianca-nome { width: 130px; }
+  .entre { flex-direction: column; align-items: flex-start; }
+
+  /* No celular o painel ocupa a tela inteira: 760px de largura em 360px de
+     aparelho deixaria o texto numa coluna de duas palavras. */
+  dialog.ajuda {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border: 0;
+    margin: 0;
+  }
+  .ajuda-topo { padding: 14px 16px 12px; }
+  .ajuda-corpo { padding: 4px 16px 32px; }
+  /* O glossário empilha: 170px de coluna fixa não cabem com o texto ao lado. */
+  .ajuda-glossario { grid-template-columns: 1fr; gap: 2px 0; }
+  .ajuda-glossario dd { margin-bottom: 12px; }
+}
+
+@media (max-width: 420px) {
+  .topo nav a { padding: 8px 10px; font-size: 13px; }
+}
+
+/* Impressão: a tela é ferramenta de trabalho, mas o registro às vezes vira
+   papel numa reunião. */
+@media print {
+  .topo, .acoes, button { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .cartao { box-shadow: none; border-color: #ccc; page-break-inside: avoid; }
+}

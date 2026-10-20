@@ -9,8 +9,13 @@
     <p class="suave">
       {{ catalogo.get(execucao.modelo, {}).get('rotulo', execucao.modelo) }} ·
       tarefa <strong>{{ execucao.tarefa }}</strong> ·
+      estratégia <code>{{ execucao.estrategia or 'unico' }}</code>
+      ({{ execucao.n_redes or 1 }} rede{{ 's' if (execucao.n_redes or 1) > 1 }}) ·
       {{ execucao.criado_em[:16].replace('T', ' ') }} ·
       {{ execucao.dispositivo }} · {{ '%.0f' | format(execucao.duracao_s or 0) }}s
+    </p>
+    <p class="suave">
+      {{ estrategias.get(execucao.estrategia or 'unico', '') }}
     </p>
   </div>
   <a href="{{ url_for('modelos') }}"><button class="secundario">Voltar aos modelos</button></a>
@@ -22,7 +27,8 @@
 
 <div class="cartao">
   <h2>Hiperparâmetros</h2>
-  <table>
+  <div class="rolagem">
+<table>
     <tbody>
       {% for chave, valor in execucao.hiperparametros.items() %}
         <tr><th>{{ chave }}</th><td>{{ valor }}</td></tr>
@@ -31,6 +37,7 @@
           <td>{{ execucao.n_treino }} / {{ execucao.n_validacao }} / {{ execucao.n_teste }}</td></tr>
     </tbody>
   </table>
+  </div>
 </div>
 
 {% if execucao.metricas %}
@@ -67,14 +74,55 @@
   </p>
 </div>
 
+{% set marcacoes = m.get('marcacoes_por_noticia') or {} %}
+{% if marcacoes %}
+<div class="cartao">
+  <h2>Quantos indicadores por notícia</h2>
+  <div class="linha">
+    <div class="indicador-caixa">
+      <span class="numero">{{ '%.2f' | format(marcacoes.media_prevista) }}</span>
+      <span class="suave">média marcada pelo modelo</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ '%.2f' | format(marcacoes.media_verdadeira) }}</span>
+      <span class="suave">média no gabarito</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ marcacoes.multiplos_previstos }}</span>
+      <span class="suave">notícias com 2+ marcados</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ marcacoes.multiplos_verdadeiros }}</span>
+      <span class="suave">notícias com 2+ no gabarito</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ marcacoes.nenhum_previsto }}</span>
+      <span class="suave">notícias sem nenhum marcado</span>
+    </div>
+  </div>
+  <p class="suave" style="margin-top:10px">
+    É a leitura direta de "o modelo marca vários indicadores ao mesmo tempo?".
+    Média prevista bem abaixo da do gabarito, ou poucas notícias com dois
+    marcados onde o gabarito tem muitas, é modelo marcando de menos — e quase
+    sempre a causa é o limiar, não o que a rede aprendeu. Notícia sem nenhum
+    indicador é resposta legítima: é a notícia fora do escopo.
+  </p>
+</div>
+{% endif %}
+
 <div class="cartao">
   <h2>Métricas por classe</h2>
-  <table>
-    <thead><tr><th>Classe</th><th>Precisão</th><th>Recall</th><th>F1</th><th>Suporte</th></tr></thead>
+  <div class="rolagem">
+<table>
+    <thead><tr><th>Classe</th><th>Limiar</th><th>Precisão</th><th>Recall</th><th>F1</th><th>Suporte</th></tr></thead>
     <tbody>
       {% for classe, valores in m.por_classe.items() %}
       <tr>
         <td>{{ classe }}</td>
+        <td>
+          {% set corte = (m.get('limiares') or {}).get(classe) %}
+          {% if corte is not none %}{{ '%.2f' | format(corte) }}{% else %}—{% endif %}
+        </td>
         <td>{{ metrica(valores.precisao) }}</td>
         <td>{{ metrica(valores.recall) }}</td>
         <td>{{ metrica(valores.f1) }}</td>
@@ -83,12 +131,141 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <p class="suave" style="margin-top:10px">
     Suporte é quantos exemplos daquela classe havia no teste. Classe com suporte
     zero não foi medida: o F1 dela aparece como 0 por convenção, não por erro do
     modelo.
   </p>
+  {% if m.get('limiares_motivo') %}
+  <p class="suave">
+    O limiar de cada classe foi escolhido pelo F1 dela na <strong>validação</strong>,
+    nunca no teste. Empate fica com o corte mais baixo de propósito: um falso
+    positivo aqui é descartável — a LLM recebe o bloco daquela classe e pode
+    descartá-la — enquanto um falso negativo é perda definitiva, porque a classe
+    que o BERT não marcou nem chega a ser avaliada.
+  </p>
+  <details>
+    <summary>Como cada limiar foi escolhido</summary>
+    <div class="rolagem">
+<table style="margin-top:8px">
+      <thead><tr><th>Classe</th><th>Limiar</th><th>Critério</th><th>Peso na perda</th></tr></thead>
+      <tbody>
+        {% for classe, motivo in m.limiares_motivo.items() %}
+        <tr>
+          <td>{{ classe }}</td>
+          <td>{{ '%.2f' | format((m.get('limiares') or {}).get(classe, 0.5)) }}</td>
+          <td class="suave">{{ motivo }}</td>
+          <td class="suave">
+            {% set peso = (m.get('pesos_positivos') or {}).get(classe) %}
+            {% if peso is not none %}{{ '%.2f' | format(peso) }}&times;{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="suave" style="margin-top:8px">
+      O peso é a razão entre negativos e positivos da classe no treino, com teto
+      de 10. Sem ele, a perda de um indicador com 20 exemplos em 400 é quase
+      minimizada por um modelo que nunca o marca.
+    </p>
+  </details>
+  {% endif %}
 </div>
+
+{% if m.get('sem_calibracao') %}
+<div class="cartao">
+  <h2>Efeito da calibração dos limiares</h2>
+  <div class="rolagem">
+<table>
+    <thead>
+      <tr><th></th><th>F1 macro</th><th>Precisão macro</th><th>Recall macro</th>
+          <th>Marcados por notícia</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>limiar por indicador (reportado)</th>
+        <td><strong>{{ metrica(m.f1_macro) }}</strong></td>
+        <td>{{ metrica(m.precisao_macro) }}</td>
+        <td>{{ metrica(m.recall_macro) }}</td>
+        <td>{{ '%.2f' | format(marcacoes.get('media_prevista', 0)) }}</td>
+      </tr>
+      <tr>
+        <th>todos em 0,5</th>
+        <td>{{ metrica(m.sem_calibracao.f1_macro) }}</td>
+        <td>{{ metrica(m.sem_calibracao.precisao_macro) }}</td>
+        <td>{{ metrica(m.sem_calibracao.recall_macro) }}</td>
+        <td>{{ '%.2f' | format((m.sem_calibracao.get('marcacoes_por_noticia') or {}).get('media_prevista', 0)) }}</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="suave" style="margin-top:10px">
+    Mesma rede, mesma partição de teste, só o corte muda. A linha de baixo é o
+    que o corte fixo de 0,5 entregaria — e a coluna da direita mostra quantos
+    indicadores ele deixava de marcar.
+  </p>
+</div>
+{% endif %}
+
+{% if m.get('cabecas') %}
+<div class="cartao">
+  <h2>As redes binárias, uma por indicador</h2>
+  <p class="suave">
+    Esta execução usou a estratégia <code>por_indicador</code>: cada indicador
+    tem a sua própria rede, treinada só para decidir se ele se aplica. As
+    respostas das {{ m.cabecas | length }} redes são reunidas num vetor
+    multirrótulo, que é o que as métricas acima medem.
+  </p>
+  <div class="rolagem">
+<table>
+    <thead>
+      <tr><th>Indicador</th><th>Positivos no treino</th><th>Peso na perda</th>
+          <th>Limiar</th><th>F1 no teste</th><th>Perda final</th></tr>
+    </thead>
+    <tbody>
+      {% for nome, cabeca in m.cabecas.items() %}
+      <tr>
+        <td>{{ nome }}</td>
+        <td class="{{ 'suave' if cabeca.n_positivos_treino else 'sem-suporte' }}">
+          {{ cabeca.n_positivos_treino }}
+        </td>
+        <td class="suave">
+          {% if cabeca.peso_positivo is not none %}{{ '%.2f' | format(cabeca.peso_positivo) }}&times;{% else %}—{% endif %}
+        </td>
+        <td>{{ '%.2f' | format((m.get('limiares') or {}).get(nome, 0.5)) }}</td>
+        <td>{{ metrica(m.por_classe.get(nome, {}).get('f1')) }}</td>
+        <td class="suave">
+          {% if cabeca.historico %}{{ '%.4f' | format(cabeca.historico[-1].perda_treino) }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <details style="margin-top:10px">
+    <summary>Aprendizado por época de cada rede</summary>
+    {% for nome, cabeca in m.cabecas.items() %}
+      <h3 style="margin-top:12px">{{ nome }}</h3>
+      <div class="rolagem">
+<table>
+        <thead><tr><th>Época</th><th>Perda no treino</th><th>F1 na validação</th></tr></thead>
+        <tbody>
+          {% for linha in cabeca.historico %}
+          <tr>
+            <td>{{ linha.epoca }}</td>
+            <td>{{ '%.4f' | format(linha.perda_treino) }}</td>
+            <td>{{ metrica(linha.get('f1_macro_validacao')) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    {% endfor %}
+  </details>
+</div>
+{% endif %}
 
 {% if m.get('matriz_confusao') %}
 <div class="cartao">
@@ -98,7 +275,8 @@
     os acertos; cada célula fora dela mostra com o que o modelo confundiu a classe.
   </p>
   <div style="overflow-x:auto">
-    <table class="matriz">
+    <div class="rolagem">
+<table class="matriz">
       <thead>
         <tr>
           <th>verdadeiro \ previsto</th>
@@ -121,6 +299,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 {% endif %}
@@ -136,13 +315,15 @@
     {% for classe, matriz in m.matrizes_por_classe.items() %}
     <div style="min-width:240px">
       <h3>{{ classe }}</h3>
-      <table class="matriz">
+      <div class="rolagem">
+<table class="matriz">
         <thead><tr><th></th><th>prev. não</th><th>prev. sim</th></tr></thead>
         <tbody>
           <tr><th>real não</th><td class="celula diagonal">{{ matriz[0][0] }}</td><td class="celula">{{ matriz[0][1] }}</td></tr>
           <tr><th>real sim</th><td class="celula">{{ matriz[1][0] }}</td><td class="celula diagonal">{{ matriz[1][1] }}</td></tr>
         </tbody>
       </table>
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -152,7 +333,8 @@
 {% if execucao.historico %}
 <div class="cartao">
   <h2>Aprendizado por época</h2>
-  <table>
+  <div class="rolagem">
+<table>
     <thead><tr><th>Época</th><th>Perda no treino</th><th>F1 macro na validação</th></tr></thead>
     <tbody>
       {% for linha in execucao.historico %}
@@ -164,9 +346,13 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <p class="suave" style="margin-top:10px">
     Perda caindo com F1 de validação parado ou piorando é sinal de sobreajuste:
-    o modelo está decorando o treino em vez de generalizar.
+    o modelo está decorando o treino em vez de generalizar. O F1 da curva usa o
+    corte neutro de 0,5 de propósito — o limiar calibrado muda a cada época, e
+    com ele a curva deixaria de mostrar o modelo aprendendo para mostrar a
+    calibração mexendo.
   </p>
 </div>
 {% endif %}

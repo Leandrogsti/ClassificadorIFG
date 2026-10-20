@@ -1,73 +1,213 @@
 {
-  "_leia_me": "Fonte editável dos indicadores. Tipo 'regra' é calculado pelo sistema sobre a lista final de vítimas; tipo 'texto' é classificado a partir das notícias (BERTimbau + skill da LLM). A aplicação de gestão (/gestao) edita este arquivo. Indicadores novos de tipo 'texto' também exigem exemplos rotulados para retreinar o BERTimbau.",
+  "_leia_me": "Catálogo dos fenômenos e circunstâncias. O campo 'decidido_por' diz QUEM decide cada um, e é a chave para ler este arquivo:\n  - 'bert'  = classe do classificador. São as 7 que entram no treino e no corpus. O BERT marca, a LLM certifica.\n  - 'llm'   = não tem classe própria no BERT. A LLM decide, dentro do bloco de outra classe que a mencione.\n  - 'regra' = calculado pelo sistema sobre a lista final de vítimas. Nem BERT nem LLM o marcam; a 'regra' é a única fonte, e ela é reavaliada a cada alteração numa vítima.\n'classe' diz ONDE o resultado vai: 'fenomeno' para FENÔMENO OBSERVADO da ocorrência, 'circunstancia' para CIRCUNSTÂNCIA das vítimas. 'skill' é o PROMPT daquela classe, enviado à LLM só quando o BERT a marca — é o que mantém a chamada pequena. 'motivacoes' são as categorias cuja definição completa é injetada junto. 'circunstancias' são as que a classe AUTORIZA a LLM a marcar nas vítimas. 'saidas' são as tabelas complementares que a classe exige. As classes de 'bert' que também têm 'regra' usam-na como conferência: entram por texto OU por regra. A aplicação de gestão (/gestao) edita este arquivo.",
   "indicadores": [
     {
       "nome": "crianca_adolescente_baleado",
       "rotulo": "Criança ou adolescente baleado",
-      "tipo": "regra",
-      "definicao": "Vítima baleada com menos de 18 anos, conforme o ECA (Lei 8.069/1990).",
-      "regra": { "operacao": "campo_menor_que", "campo": "idade", "valor": 18 }
+      "classe": "fenomeno",
+      "tipo": "texto",
+      "definicao": "Pessoa com menos de 18 anos atingida por disparo de arma de fogo, conforme o ECA (Lei 8.069/1990).",
+      "skill": "",
+      "circunstancias": [
+        "trajeto_escolar",
+        "bala_perdida"
+      ],
+      "regra": {
+        "ou": [
+          {
+            "operacao": "campo_menor_que",
+            "campo": "idade",
+            "valor": 18
+          },
+          {
+            "operacao": "campo_em",
+            "campo": "grupo_etario",
+            "valores": [
+              "crianca",
+              "adolescente"
+            ]
+          }
+        ]
+      },
+      "exemplos": [
+        "Um menino de 9 anos foi atingido de raspão enquanto brincava na calçada.",
+        "A adolescente de 15 anos morreu a caminho do hospital após ser baleada."
+      ],
+      "decidido_por": "bert"
     },
     {
       "nome": "mulheres_baleadas",
       "rotulo": "Mulheres baleadas",
-      "tipo": "regra",
-      "definicao": "Vítima baleada do gênero feminino.",
-      "regra": { "operacao": "campo_igual", "campo": "genero", "valor": "feminino" }
-    },
-    {
-      "nome": "vitimizacao_policial",
-      "rotulo": "Vitimização policial",
-      "tipo": "regra",
-      "definicao": "Vítima baleada que é agente de segurança, em serviço ou de folga.",
-      "regra": { "operacao": "campo_igual", "campo": "tipo_vitima", "valor": "agente_seguranca" }
-    },
-    {
-      "nome": "politico_baleado",
-      "rotulo": "Político baleado",
-      "tipo": "regra",
-      "definicao": "Vítima baleada com cargo eletivo, função política ou candidatura.",
-      "regra": { "operacao": "campo_preenchido", "campo": "cargo_politico" }
-    },
-    {
-      "nome": "chacina",
-      "rotulo": "Chacina",
-      "tipo": "regra",
-      "definicao": "Três ou mais pessoas mortas na mesma ocorrência.",
-      "regra": { "operacao": "contagem_minima", "campo": "situacao", "valor": "morta", "minimo": 3 }
-    },
-    {
-      "nome": "acao_policial",
-      "rotulo": "Ação policial",
+      "classe": "fenomeno",
       "tipo": "texto",
-      "definicao": "Agentes de segurança em serviço atuando na cena no momento do disparo, trocando tiros ou sendo alvo.",
-      "skill": "Marque acao_policial somente se agentes de segurança estavam presentes e atuando NO MOMENTO do disparo (trocando tiros ou sendo alvo). Polícia que chega depois para socorrer, periciar, apreender arma/corpo ou investigar NÃO conta. Agente de folga reagindo a assalto conta. Citação de operação policial em outro contexto ou em outro momento não conta.",
+      "definicao": "Pessoa do gênero feminino atingida por disparo de arma de fogo, qualquer que seja a motivação.",
+      "skill": "O classificador JÁ marcou mulheres_baleadas. NÃO é sua tarefa decidir se há mulher atingida. Conta mulher cis e mulher trans ou travesti: preencha `genero` como `mulher_cis` ou `mulher_trans_travesti`.\nAGORA DECIDA O FEMINICÍDIO, que só se avalia aqui. Marque a circunstância `feminicidio_tentativa` na mulher atingida SOMENTE quando o disparo foi motivado pela condição de gênero dela, e marque junto o fenômeno `violencia_genero`. Consumado (morta) e tentado (ferida) usam a MESMA circunstância; o que os distingue é o `status`.\nELEMENTOS QUE CARACTERIZAM: autor era marido, companheiro, ex-parceiro ou tinha relação íntima ou doméstica com ela; violência doméstica ou familiar; ciúme, separação, perseguição, descumprimento de medida protetiva.\nNÃO É FEMINICÍDIO: mulher atingida por bala perdida; em confronto com a polícia; em combate; em assalto comum; e qualquer caso sem elemento que ligue o disparo à condição de mulher. Na dúvida NÃO marque, e escreva o motivo em `divergencias`.\n`agente_seguranca_agressor` marca a MULHER ATINGIDA quando quem atirou nela era agente de segurança — policial, guarda, militar. Vai na vítima, nunca no agressor. Um agente que foi BALEADO é vítima, não agressor: JAMAIS ponha esta circunstância nele.",
+      "circunstancias": [
+        "feminicidio_tentativa",
+        "bala_perdida",
+        "agente_seguranca_agressor"
+      ],
+      "regra": {
+        "operacao": "campo_em",
+        "campo": "genero",
+        "valores": [
+          "mulher_cis",
+          "mulher_trans_travesti"
+        ]
+      },
       "exemplos": [
-        "Durante operação do Bope na comunidade, houve troca de tiros e dois suspeitos morreram.",
-        "PM de folga reagiu ao assalto e atirou contra os criminosos."
-      ]
-    },
-    {
-      "nome": "crime_organizado",
-      "rotulo": "Crime organizado",
-      "tipo": "texto",
-      "definicao": "Envolvimento de facção, milícia ou grupo armado estruturado na dinâmica do disparo, incluindo disputa de território.",
-      "skill": "Marque crime_organizado quando o texto indicar facção, milícia, tráfico organizado, grupo armado estruturado ou disputa de território como parte da dinâmica do disparo. Menção genérica a 'bandidos' ou 'criminosos' sem estrutura de grupo NÃO basta. Antecedentes do envolvido, sem relação com o disparo, também não bastam.",
-      "exemplos": [
-        "Os disparos são atribuídos à disputa entre facções rivais pelo controle do território.",
-        "A milícia local teria ordenado o ataque contra o comerciante."
-      ]
+        "Uma mulher de 32 anos foi baleada na perna durante o assalto ao mercado.",
+        "A comerciante foi atingida por bala perdida durante a troca de tiros."
+      ],
+      "decidido_por": "bert"
     },
     {
       "nome": "violencia_genero",
       "rotulo": "Violência de gênero",
+      "classe": "fenomeno",
       "tipo": "texto",
-      "definicao": "Disparo motivado pela condição de gênero da vítima, incluindo feminicídio e violência doméstica praticada por parceiro ou ex-parceiro.",
-      "skill": "Marque violencia_genero quando o disparo for motivado pela condição de gênero da vítima: feminicídio, violência doméstica ou familiar, agressão por parceiro ou ex-parceiro, ciúme, separação, perseguição. Mulher atingida por bala perdida ou em assalto comum NÃO é violência de gênero — é preciso que o gênero seja o motivo.",
+      "definicao": "Disparo motivado pela condição de gênero da vítima, incluindo feminicídio, violência doméstica e LGBTfobia. Decidido pela LLM: não tem classe própria no BERT, é avaliado dentro dos blocos de mulheres_baleadas e lgbtqiapn.",
+      "skill": "",
+      "circunstancias": [],
+      "decidido_por": "llm"
+    },
+    {
+      "nome": "acao_policial",
+      "rotulo": "Ação policial",
+      "classe": "fenomeno",
+      "tipo": "texto",
+      "definicao": "Agentes de segurança EM SERVIÇO atuando na cena no momento do disparo, trocando tiros ou sendo alvo. Agente de folga, aposentado ou exonerado atingido fora de uma ação NÃO é ação policial.",
+      "skill": "O classificador JÁ marcou acao_policial nesta notícia. EXTRAIA e preencha a tabela: foi `acao_de_rotina` — uma guarnição atendendo um chamado — ou `operacao_policial`, planejada, com múltiplas equipes, unidades especializadas (Bope, Core, Choque) ou nome próprio?\nREGRA SEM EXCEÇÃO: só há ação policial quando agentes EM SERVIÇO estavam atuando na cena NO MOMENTO do disparo, trocando tiros ou sendo alvo. Agente de folga, à paisana, de licença, aposentado ou exonerado NÃO está em ação policial — nem quando é ele a vítima. Se o único agente da notícia está `fora_de_servico` ou `aposentado_exonerado`, esta classe não se sustenta: deixe a tabela `acao_policial` de fora e escreva `acao_policial` em `nao_sustentados`. Um policial executado na folga é vitimização policial, que o sistema calcula sozinho, e não ação policial.\n`unidades_presentes` é a unidade que estava NA CENA. O batalhão ou a delegacia a que a vítima pertence NÃO é unidade presente: isso vai em `unidade`, dentro de `vitimizacao_policial`.\nAgente ATINGIDO: inclua `agente` no `tipo_vitima` dele. A vitimização policial é classe própria do classificador desde 2026-10-09, com bloco e tabela próprios quando marcada — aqui basta o tipo da vítima.\nQUANDO NÃO PREENCHER: se a polícia só chegou DEPOIS — para socorrer, periciar, apreender arma ou corpo, ou investigar —, ou se a operação citada foi em outro momento ou contexto, não invente a dinâmica: deixe a tabela de fora e escreva `acao_policial` em `nao_sustentados`.",
+      "circunstancias": [],
       "exemplos": [
-        "O ex-companheiro a perseguiu até o trabalho e atirou após ela pedir a separação.",
-        "A vítima tinha medida protetiva contra o autor dos disparos."
+        "Durante operação do Bope na comunidade, houve troca de tiros e dois suspeitos morreram.",
+        "PM de folga reagiu ao assalto e atirou contra os criminosos."
+      ],
+      "decidido_por": "bert",
+      "saidas": [
+        {
+          "chave": "acao_policial",
+          "formato": "{\"contexto\": \"acao_de_rotina|operacao_policial\", \"corporacoes_presentes\": [\"policia_militar\"], \"unidades_presentes\": \"nome das unidades citadas, ou null\"}",
+          "notas": "Vai na raiz do JSON. `contexto` é obrigatório. `corporacoes_presentes` aceita várias; use [\"nao_identificado\"] quando a notícia não disser qual."
+        }
       ]
+    },
+    {
+      "nome": "vitimizacao_policial",
+      "rotulo": "Vitimização policial",
+      "classe": "fenomeno",
+      "tipo": "texto",
+      "definicao": "Agente de segurança atingido por disparo de arma de fogo — policial militar, civil, federal, guarda municipal, agente penitenciário, militar das forças armadas. Vale em serviço, de folga, à paisana, aposentado ou da reserva: o que conta é a pessoa atingida ser agente, não a situação em que estava.",
+      "regra": {
+        "operacao": "lista_contem",
+        "campo": "tipo_vitima",
+        "valor": "agente"
+      },
+      "decidido_por": "bert",
+      "skill": "O classificador JÁ marcou vitimizacao_policial. NÃO é sua tarefa decidir se há agente atingido. Inclua `agente` no `tipo_vitima` dele e preencha a tabela complementar abaixo.\nNÃO CONFUNDA COM AÇÃO POLICIAL: policial baleado de folga é vitimização policial e NÃO é ação policial. As duas coexistem só quando o agente foi atingido estando em serviço numa ação ou operação.\nQUANDO NÃO PREENCHER: se o agente citado não foi atingido — chegou depois, estava presente sem ser alvo, ou é o autor do disparo —, deixe a tabela de fora e escreva `vitimizacao_policial` em `nao_sustentados`."
+    },
+    {
+      "nome": "crime_organizado",
+      "rotulo": "Crime organizado",
+      "classe": "fenomeno",
+      "tipo": "texto",
+      "definicao": "Envolvimento de facção, milícia ou grupo armado estruturado na dinâmica do disparo, incluindo disputa de território.",
+      "skill": "O classificador JÁ marcou crime_organizado nesta notícia. NÃO é sua tarefa decidir se há facção, milícia ou grupo armado envolvido. EXTRAIA e estruture: os contextos (podem ser vários) e os grupos ou organizações citados pelo nome. Marque também a circunstância `tribunal_do_crime` quando houve imobilização ou punição antes dos disparos. Preencha a tabela complementar. Se agentes de segurança estavam no confronto, NÃO marque acao_policial por conta própria — registre a observação em `divergencias` e o analista decide. QUANDO NÃO PREENCHER: se o texto só trouxer menção genérica a \"bandidos\" ou \"criminosos\", sem estrutura de grupo, ou apenas antecedentes do envolvido sem relação com o disparo, não invente a estrutura: deixe a tabela de fora e escreva `crime_organizado` em `nao_sustentados`.",
+      "circunstancias": [
+        "tribunal_do_crime"
+      ],
+      "exemplos": [
+        "Os disparos são atribuídos à disputa entre facções rivais pelo controle do território.",
+        "A milícia local teria ordenado o ataque contra o comerciante."
+      ],
+      "decidido_por": "bert",
+      "saidas": [
+        {
+          "chave": "crime_organizado",
+          "formato": "{\"contextos\": [\"disputa_grupos_armados|ataque_alvos_civis|presenca_grupos_armados|tribunal_do_crime|chacina\"], \"grupos_citados\": [\"nome do grupo como a notícia o traz\"]}",
+          "notas": "Vai na raiz do JSON. `contextos` aceita vários e é obrigatório. `grupos_citados` fica [] quando nenhum grupo é nomeado — não invente nome de facção."
+        }
+      ]
+    },
+    {
+      "nome": "chacina",
+      "rotulo": "Chacina",
+      "classe": "fenomeno",
+      "tipo": "texto",
+      "definicao": "Três ou mais pessoas mortas por disparo na mesma ocorrência, contando civis e agentes de segurança que NÃO estavam em serviço. O agente em serviço fica fora da contagem: numa ação policial ele está do outro lado do mesmo fato. Calculado pelo sistema sobre a lista final de vítimas, e reavaliado quando um ferido morre semanas depois.",
+      "regra": {
+        "operacao": "contagem_minima",
+        "campo": "status",
+        "valor": "morta",
+        "minimo": 3,
+        "exceto": {
+          "e": [
+            {
+              "operacao": "lista_contem",
+              "campo": "tipo_vitima",
+              "valor": "agente"
+            },
+            {
+              "operacao": "campo_igual",
+              "campo": "vitimizacao_policial.status_agente",
+              "valor": "em_servico"
+            }
+          ]
+        }
+      },
+      "decidido_por": "regra"
+    },
+    {
+      "nome": "politico_baleado",
+      "rotulo": "Político baleado",
+      "classe": "fenomeno",
+      "tipo": "texto",
+      "definicao": "Pessoa com cargo eletivo, candidatura ou pré-candidatura atingida por disparo de arma de fogo (definição reduzida).",
+      "skill": "",
+      "circunstancias": [],
+      "regra": {
+        "operacao": "lista_contem",
+        "campo": "tipo_vitima",
+        "valor": "politico"
+      },
+      "exemplos": [
+        "O vereador foi baleado ao sair de uma reunião com lideranças do bairro.",
+        "Candidato a prefeito sofreu atentado a tiros durante caminhada eleitoral."
+      ],
+      "decidido_por": "bert",
+      "saidas": []
+    },
+    {
+      "nome": "suicidio",
+      "rotulo": "Suicídio",
+      "classe": "circunstancia",
+      "tipo": "texto",
+      "definicao": "Disparo autoinfligido com intenção de morte, consumado ou tentado. É circunstância da vítima, não fenômeno da ocorrência.",
+      "skill": "O classificador JÁ marcou suicidio nesta notícia. NÃO é sua tarefa decidir se o disparo foi autoinfligido. Marque a circunstância `suicidio` na vítima que se feriu ou se matou, e só nela. Quando o autor mata alguém e em seguida se suicida, são DUAS vítimas: a primeira sem esta circunstância, a segunda com ela. Agente de segurança que se suicida recebe esta circunstância, e isso NÃO acrescenta acao_policial. QUANDO NÃO PREENCHER: se o texto indicar terceira pessoa envolvida no disparo, ou disparo autoinfligido SEM intenção de morte (limpeza da arma, manuseio indevido, queda), a circunstância correta é `acidente` — use-a e escreva `suicidio` em `nao_sustentados`.",
+      "circunstancias": [
+        "suicidio"
+      ],
+      "exemplos": [
+        "O homem foi encontrado com um ferimento de arma de fogo autoprovocado e não resistiu.",
+        "Após matar a ex-companheira, o autor virou a arma contra si."
+      ],
+      "decidido_por": "bert"
+    },
+    {
+      "nome": "lgbtqiapn",
+      "rotulo": "LGBTQIAPN+",
+      "classe": "circunstancia",
+      "tipo": "texto",
+      "definicao": "Vítima identificada como LGBTQIAPN+ pela notícia. É circunstância da vítima, não fenômeno da ocorrência.",
+      "skill": "Marque a circunstância `lgbtqiapn` na vítima a que se aplica e preencha `genero` de forma coerente (`mulher_trans_travesti`, `homem_trans`, `nao_binario` quando for o caso). O campo `genero` guarda IDENTIDADE; a circunstância é o que registra lésbica, gay ou bissexual cis, que o gênero não alcança. A circunstância vale mesmo que o disparo não tenha relação com isso. Se o texto não AFIRMAR a identidade e você só a estaria deduzindo de nome, profissão ou de quem a acompanhava, não a registre — escreva `lgbtqiapn` em `nao_sustentados`.\nAGORA DECIDA A LGBTFOBIA, que só se avalia aqui: marque o fenômeno `violencia_genero` quando o disparo foi motivado por quem a vítima é — orientação sexual ou identidade de gênero. Vítima LGBTQIAPN+ atingida em assalto, bala perdida ou confronto alheio recebe a circunstância, mas NÃO o fenômeno.",
+      "circunstancias": [
+        "lgbtqiapn"
+      ],
+      "exemplos": [
+        "A travesti foi baleada enquanto trabalhava na avenida.",
+        "O casal gay foi atacado a tiros após sair da festa."
+      ],
+      "decidido_por": "bert"
     }
   ]
 }

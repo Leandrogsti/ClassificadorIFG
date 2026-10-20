@@ -3,34 +3,129 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2D3637">
   <title>{% block titulo %}Classificador de Violência Armada{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='simbolo-fogocruzado.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
 </head>
 <body>
+  {#- A navegação é montada a partir de uma lista, e não escrita onze vezes:
+      é o que permite marcar o item ativo comparando com `request.endpoint`
+      sem repetir a condição em cada link. -#}
+  {% set menu = [
+    ('fila_recebidas', 'Recebidas', recebidas_pendentes),
+    ('inicio', 'Ocorrências', 0),
+    ('vitimas', 'Vítimas', 0),
+    ('aprovacao', 'Aprovação', 0),
+    ('alertas', 'Alertas', 0),
+    ('corpus_repositorio', 'Corpus', 0),
+    ('modelos', 'Modelos', 0),
+    ('classificacoes', 'Classificações', 0),
+    ('testar', 'Testar', 0),
+    ('gestao', 'Gestão', 0),
+    ('locais_e_listas', 'Locais', 0),
+    ('editar_prompts', 'Prompts', 0),
+  ] %}
+
   <header class="topo">
-    <a class="marca" href="{{ url_for('inicio') }}">Classificador de Violência Armada</a>
-    <nav>
-      <a href="{{ url_for('inicio') }}">Ocorrências</a>
-      <a href="{{ url_for('vitimas') }}">Vítimas</a>
-      <a href="{{ url_for('aprovacao') }}">Aprovação</a>
-      <a href="{{ url_for('alertas') }}">Alertas</a>
-      <a href="{{ url_for('acompanhamento') }}">Acompanhamento</a>
-      <a href="{{ url_for('corpus_repositorio') }}">Corpus</a>
-      <a href="{{ url_for('modelos') }}">Modelos</a>
-      <a href="{{ url_for('testar') }}">Testar</a>
-      <a href="{{ url_for('gestao') }}">Gestão</a>
-    </nav>
-    <form class="analista" method="post" action="{{ url_for('definir_analista') }}">
-      <input name="analista" value="{{ analista }}" placeholder="Seu nome (analista)" required>
-      <button type="submit">Entrar</button>
-    </form>
+    <div class="topo-interno">
+      <a class="marca" href="{{ url_for('inicio') }}" title="Início">
+        <span class="logotipo" aria-label="Fogo Cruzado" role="img"></span>
+        <span class="marca-sub">Classificador</span>
+      </a>
+
+      <nav aria-label="Seções">
+        {% for destino, rotulo, contagem in menu %}
+          <a href="{{ url_for(destino) }}"
+             class="{{ 'ativa' if request.endpoint == destino }}"
+             {{ 'aria-current=page' if request.endpoint == destino }}>
+            {{ rotulo }}{% if contagem %}<span class="contador">{{ contagem }}</span>{% endif %}
+          </a>
+        {% endfor %}
+      </nav>
+
+      <form class="analista" method="post" action="{{ url_for('definir_analista') }}">
+        <input name="analista" value="{{ analista }}" aria-label="Seu nome"
+               placeholder="Seu nome (analista)" required>
+        <button type="submit" class="pequeno">Entrar</button>
+      </form>
+
+      {#- O botão só existe quando há ajuda para esta rota. Botão que abre
+          painel vazio é pior que botão nenhum. -#}
+      {% if ajuda_tela %}
+        <button type="button" class="botao-ajuda pequeno" id="abrir-ajuda"
+                aria-haspopup="dialog"
+                title="O que é esta tela, parte por parte">
+          ? Ajuda
+        </button>
+      {% endif %}
+    </div>
   </header>
+
+  {% if ajuda_tela %}
+  <dialog id="painel-ajuda" class="ajuda" aria-labelledby="ajuda-titulo">
+    <div class="ajuda-topo">
+      <div>
+        <h2 id="ajuda-titulo">{{ ajuda_tela.titulo }}</h2>
+        <p class="suave">{{ ajuda_tela.resumo }}</p>
+      </div>
+      <button type="button" class="secundario pequeno" id="fechar-ajuda"
+              autofocus>Fechar</button>
+    </div>
+
+    <div class="ajuda-corpo">
+      <h3>Parte por parte</h3>
+      {% for nome, texto in ajuda_tela.secoes %}
+        <div class="ajuda-secao">
+          <h4>{{ nome }}</h4>
+          <p>{{ texto }}</p>
+        </div>
+      {% endfor %}
+
+      <h3>Por que esta tela é assim</h3>
+      {#- O "porquê" vem em parágrafos separados por linha em branco: é texto
+          longo, e um bloco único de dez linhas não se lê. -#}
+      {% for paragrafo in ajuda_tela.construcao.split('\n\n') %}
+        <p>{{ paragrafo }}</p>
+      {% endfor %}
+
+      {% if ajuda_tela.glossario %}
+        <h3>Palavras e siglas desta tela</h3>
+        <dl class="ajuda-glossario">
+          {% for termo, explicacao in ajuda_tela.glossario %}
+            <dt>{{ termo }}</dt>
+            <dd>{{ explicacao }}</dd>
+          {% endfor %}
+        </dl>
+      {% endif %}
+    </div>
+  </dialog>
+
+  <script>
+    /* A ajuda abre só no clique — nunca sozinha. É consulta, não tutorial:
+       quem já sabe usar a tela não pode ser interrompido por ela.
+       `showModal` dá de graça o fechar com Esc e o foco preso no painel. */
+    (function () {
+      var painel = document.getElementById('painel-ajuda');
+      var abrir = document.getElementById('abrir-ajuda');
+      var fechar = document.getElementById('fechar-ajuda');
+      if (!painel || !abrir) return;
+      abrir.addEventListener('click', function () { painel.showModal(); });
+      fechar.addEventListener('click', function () { painel.close(); });
+      /* Clicar fora fecha: o <dialog> recebe o clique do fundo escuro, então
+         basta conferir se o alvo foi o próprio painel e não algo dentro. */
+      painel.addEventListener('click', function (evento) {
+        if (evento.target === painel) painel.close();
+      });
+    })();
+  </script>
+  {% endif %}
 
   <main>
     {% with mensagens = get_flashed_messages(with_categories=true) %}
       {% if mensagens %}
         {% for categoria, mensagem in mensagens %}
-          <p class="aviso aviso-{{ categoria }}">{{ mensagem }}</p>
+          <p class="aviso aviso-{{ categoria }}" role="status">{{ mensagem }}</p>
         {% endfor %}
       {% endif %}
     {% endwith %}

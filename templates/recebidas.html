@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block titulo %}Recebidas{% endblock %}
+
+{% block conteudo %}
+<h1>Recebidas</h1>
+
+<p class="suave">
+  A notícia entra aqui antes de virar ocorrência. O classificador olha primeiro;
+  o que ele não reconhecer fica à espera de uma pessoa. Rotular uma notícia aqui
+  é o que ensina o classificador — inclusive quando a conclusão é que não há
+  fenômeno nenhum, que é o exemplo que o ensina a recusar o que está fora do
+  escopo.
+</p>
+
+{% if not estatisticas.modelo_treinado %}
+  <p class="aviso aviso-aviso">
+    Não há modelo treinado ainda, então <strong>nada é classificado
+    automaticamente</strong>: toda notícia cai na fila para você rotular. É esse
+    trabalho que constrói o corpus do primeiro treino.
+  </p>
+{% elif defasagem.ausentes %}
+  <p class="aviso aviso-erro">
+    <strong>O modelo não conhece
+    {% for n in defasagem.ausentes %}
+      <code>{{ n }}</code>{{ ', ' if not loop.last }}
+    {% endfor %}.</strong>
+    {{ 'Esses indicadores foram criados' if defasagem.ausentes|length > 1 else 'Esse indicador foi criado' }}
+    depois do último treino, então a triagem desta tela não
+    {{ 'os' if defasagem.ausentes|length > 1 else 'o' }} enxerga: notícia que só
+    {{ 'os' if defasagem.ausentes|length > 1 else 'o' }} sustente vai para o
+    <strong>arquivo</strong> como se não tivesse nada.
+    Treine em <a href="{{ url_for('modelos') }}">Modelos</a> e depois use
+    <em>Reavaliar o arquivo</em> aqui.
+  </p>
+{% endif %}
+
+<div class="cartao" {% if filtros.estado == 'arquivo' %}hidden{% endif %}>
+  <h2>Receber notícia</h2>
+  <form method="post" action="{{ url_for('receber_noticia') }}">
+    <div class="linha">
+      <div style="flex:2">
+        <label for="link">Link</label>
+        <input id="link" name="link" placeholder="https://...">
+      </div>
+      <div>
+        <label for="data_noticia">Data da notícia</label>
+        <input id="data_noticia" name="data_noticia" type="date">
+      </div>
+    </div>
+    <label for="texto">Texto</label>
+    <textarea id="texto" name="texto" rows="8" required
+              placeholder="Cole aqui o texto da notícia"></textarea>
+    <button type="submit">Receber</button>
+  </form>
+</div>
+
+{#- As abas separam TRABALHO de ACERVO. A fila é o que espera uma pessoa; o
+    arquivo é o que o classificador leu e não reconheceu, guardado para quando
+    houver modelo ou indicador novo. Misturar os dois fazia o caso mais comum —
+    tiroteio sem característica especial — emperrar a fila para sempre. -#}
+<div class="abas">
+  <a class="aba {{ 'ativa' if filtros.estado != 'arquivo' }}"
+     href="{{ url_for('fila_recebidas') }}">
+    Fila{% if estatisticas.pendentes %} ({{ estatisticas.pendentes }}){% endif %}
+  </a>
+  <a class="aba {{ 'ativa' if filtros.estado == 'arquivo' }}"
+     href="{{ url_for('fila_recebidas', estado='arquivo') }}">
+    Arquivo{% if estatisticas.arquivadas %} ({{ estatisticas.arquivadas }}){% endif %}
+  </a>
+</div>
+
+{% if filtros.estado == 'arquivo' %}
+  <div class="cartao">
+    <h2>Arquivo</h2>
+    <p class="suave" style="margin-top:0">
+      Notícias em que o classificador não encontrou indicador nenhum. Elas
+      <strong>não vão à LLM</strong> e não ocupam a fila — ficam guardadas com o
+      texto completo, à espera de um modelo melhor ou de um indicador novo no
+      catálogo. É o caso do tiroteio comum, sem nenhuma das características que
+      os sete indicadores descrevem.
+    </p>
+    <form method="post" action="{{ url_for('reprocessar_arquivo') }}">
+      <button type="submit" {% if not estatisticas.modelo_treinado %}disabled{% endif %}>
+        Reavaliar o arquivo com o modelo atual
+      </button>
+      <span class="suave">
+        {% if estatisticas.modelo_treinado %}
+          Relê {{ estatisticas.reprocessaveis }} notícia(s). O que uma pessoa já
+          decidiu não é tocado.
+        {% else %}
+          Sem modelo treinado não há o que reavaliar.
+        {% endif %}
+      </span>
+    </form>
+  </div>
+{% endif %}
+
+<div class="cartao">
+  <h2>{{ 'No arquivo' if filtros.estado == 'arquivo' else 'Fila' }}</h2>
+  <p class="suave" style="margin-top:0">
+    {% for estado, rotulo in estados.items() %}
+      <span class="etiqueta">{{ rotulo }}: {{ estatisticas.por_estado[estado] }}</span>
+    {% endfor %}
+    {% if estatisticas.pendentes %}
+      <strong>{{ estatisticas.pendentes }} esperando você.</strong>
+    {% endif %}
+  </p>
+
+  <form method="get" class="linha">
+    <div>
+      <label for="estado">Estado</label>
+      <select id="estado" name="estado">
+        <option value="">Todos</option>
+        {% for estado, rotulo in estados.items() %}
+          <option value="{{ estado }}" {% if filtros.estado == estado %}selected{% endif %}>
+            {{ rotulo }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="flex:2">
+      <label for="busca">Buscar no texto ou no link</label>
+      <input id="busca" name="busca" value="{{ filtros.busca }}">
+    </div>
+    <div style="align-self:end"><button type="submit" class="secundario">Filtrar</button></div>
+  </form>
+
+  {% if not lista %}
+    <p class="suave">Nada na fila com esse filtro.</p>
+  {% endif %}
+
+  {% for r in lista %}
+    <div class="cartao {{ r.cor }}" style="margin-top:12px">
+      <div class="linha">
+        <div style="flex:2">
+          <strong>#{{ r.id }}</strong>
+          <span class="selo {{ r.cor|replace('faixa-', 'selo-') }}">
+            {{ estados[r.estado] }}
+          </span>
+          {% if r.marcado_por %}
+            <span class="suave">marcado por {{ r.marcado_por }}</span>
+          {% endif %}
+          {% if r.data_noticia %}<span class="suave">· {{ r.data_noticia }}</span>{% endif %}
+        </div>
+        <div style="text-align:right">
+          {% if r.estado == 'com_fenomeno' %}
+            <a href="{{ url_for('nova_ocorrencia', recebida=r.id) }}">Virar ocorrência</a>
+          {% elif r.estado == 'virou_ocorrencia' and r.ocorrencia_id %}
+            <a href="{{ url_for('ocorrencia', ocorrencia_id=r.ocorrencia_id) }}">
+              Ver ocorrência
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if r.link %}
+        <p class="suave" style="margin:4px 0">
+          <a href="{{ r.link }}" target="_blank" rel="noopener">{{ r.link }}</a>
+        </p>
+      {% endif %}
+
+      {% if r.concordancia %}
+        <p class="suave" style="margin:6px 0">
+          Concordância do classificador
+          {% if r.n_modelos %}(de {{ r.n_modelos }} modelo{{ 's' if r.n_modelos > 1 }},
+          {{ r.votos_para_prosseguir }} basta{{ 'm' if r.votos_para_prosseguir > 1 }}
+          para seguir){% endif %}:
+          {% for nome, votos in r.concordancia.items() if votos %}
+            <span class="selo {{ 'selo-ok' if votos >= r.votos_para_prosseguir else 'selo-alerta' }}">
+              {{ nome }} {{ votos }}/{{ r.n_modelos or 1 }}
+            </span>
+          {% endfor %}
+          {% if not r.concordancia.values()|select|list %}
+            <span class="selo selo-revisao">nenhum indicador marcado</span>
+          {% endif %}
+        </p>
+      {% endif %}
+
+      {% if r.estado == 'arquivo' %}
+        <p class="aviso aviso-erro" style="margin:6px 0">
+          O classificador não marcou nenhum indicador, então esta notícia está
+          no acervo: não foi à LLM e não vira ocorrência. Se ele deixou passar
+          algo, marque abaixo e ela volta ao fluxo. Se está mesmo fora do
+          escopo, deixe aqui — ela será relida quando houver indicador novo.
+        </p>
+      {% elif r.estado == 'alerta' %}
+        <p class="aviso aviso-aviso" style="margin:6px 0">
+          Ficou abaixo do corte: {{ r.duvidosos|join(', ') }}. Os modelos não
+          concordaram o bastante para seguir sozinhos. Confirme ou descarte.
+        </p>
+      {% endif %}
+
+      <details>
+        <summary>Texto ({{ r.texto|length }} caracteres)</summary>
+        <p class="suave">{{ r.texto }}</p>
+      </details>
+
+      {% if r.estado != 'virou_ocorrencia' %}
+        <form method="post" action="{{ url_for('rotular_recebida', recebida_id=r.id) }}"
+              style="margin-top:8px">
+          <label>Quais indicadores esta notícia sustenta?</label>
+          <p class="suave" style="margin-top:0">
+            Nenhum marcado significa "li e não há fenômeno" — é uma decisão, não
+            uma pendência, e vale tanto para o treino quanto as outras.
+          </p>
+          <div class="grade-indicadores">
+            {% for i in classes %}
+              <label class="caixa">
+                <span class="cabeca">
+                  <input type="checkbox" name="indicadores" value="{{ i.nome }}"
+                         {% if i.nome in r.indicadores %}checked{% endif %}>
+                  {{ i.rotulo }}
+                </span>
+                <span class="suave">{{ i.definicao[:110] }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          <button type="submit">Salvar rótulo e mandar ao corpus</button>
+        </form>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('excluir_recebida', recebida_id=r.id) }}"
+            onsubmit="return confirm('Remover esta notícia da fila?')"
+            style="margin-top:6px">
+        <button type="submit" class="perigo">Remover da fila</button>
+      </form>
+    </div>
+  {% endfor %}
+
+  {% if paginas > 1 %}
+    <p class="suave">
+      Página {{ pagina }} de {{ paginas }} ({{ total }} notícias)
+      {% if pagina > 1 %}
+        <a href="{{ url_for('fila_recebidas', pagina=pagina-1, **filtros) }}">anterior</a>
+      {% endif %}
+      {% if pagina < paginas %}
+        <a href="{{ url_for('fila_recebidas', pagina=pagina+1, **filtros) }}">próxima</a>
+      {% endif %}
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

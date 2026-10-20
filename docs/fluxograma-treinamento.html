@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluxograma do treinamento</title>
+<style>
+  :root {
+    --fundo: #fbfbfd; --texto: #1c2430; --suave: #5c6878;
+    --borda: #dfe4ec; --cartao: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #14181e; --texto: #e6eaf0; --suave: #9aa6b5;
+      --borda: #2b323c; --cartao: #1b2027;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 16px 80px; background: var(--fundo);
+    color: var(--texto); font: 16px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 4px; }
+  h2 {
+    font-size: 1.3rem; margin: 44px 0 12px; padding-top: 18px;
+    border-top: 1px solid var(--borda);
+  }
+  h3 { font-size: 1.05rem; margin: 28px 0 8px; }
+  p, li { color: var(--texto); }
+  code {
+    background: var(--cartao); border: 1px solid var(--borda);
+    border-radius: 4px; padding: 1px 5px; font-size: 0.88em;
+  }
+  .diagrama {
+    background: var(--cartao); border: 1px solid var(--borda);
+    border-radius: 10px; padding: 18px; margin: 18px 0; overflow-x: auto;
+  }
+  .diagrama svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  .aviso {
+    background: var(--cartao); border: 1px solid var(--borda);
+    border-left: 3px solid #b0561a; border-radius: 6px;
+    padding: 10px 14px; color: var(--suave); font-size: 0.92rem;
+  }
+  hr { display: none; }
+  @media print {
+    body { padding: 0; }
+    h2 { page-break-before: always; border-top: 0; }
+    .diagrama { page-break-inside: avoid; border-color: #ccc; }
+    .aviso { display: none; }
+  }
+</style>
+<main>
+<p class="aviso">
+  Gerado de <code>fluxograma-treinamento.md</code>. Para salvar um diagrama como imagem, clique
+  nele com o botão direito e escolha salvar, ou use Ctrl&nbsp;+&nbsp;P para PDF.
+</p>
+<h1>Fluxograma do treinamento</h1>
+<p>Companheiro de <code>fluxograma.md</code>, que descreve o caminho de uma notícia até virar registro. Aqui é o outro ciclo: como o classificador aprende.</p>
+<p>Fonte em Mermaid; renderiza no GitHub e na pré-visualização do VS Code. Para exportar imagem, <a href="https://mermaid.live">https://mermaid.live</a>.</p>
+<p>Mantenha junto do código: um fluxograma que descreve uma versão antiga do fluxo é pior que nenhum.</p>
+<h2>1. De onde vem o rótulo</h2>
+<p>Antes de treinar é preciso ter exemplo rotulado, e há <strong>três portas</strong> por onde ele entra. Nenhuma delas pede trabalho extra: todas aproveitam decisão que alguém já tomou por outro motivo.</p>
+<div class="diagrama"><pre class="mermaid">flowchart TD
+    R[&quot;Fila de recebidas&lt;br/&gt;&lt;small&gt;júnior rotula a notícia que chegou&lt;/small&gt;&quot;]
+    A[&quot;Aprovação de ocorrência&lt;br/&gt;&lt;small&gt;o sênior confirma: entra APROVADA&lt;/small&gt;&quot;]
+    I[&quot;Importação de planilha&lt;br/&gt;&lt;small&gt;corpus que já existia fora daqui&lt;/small&gt;&quot;]
+
+    D{&quot;Esse texto&lt;br/&gt;já está no corpus?&quot;}
+    CORPUS[(&quot;corpus_noticia&lt;br/&gt;&lt;small&gt;texto · rótulos · partição&lt;/small&gt;&quot;)]
+    DESC[&quot;Devolve o id do que já existe&lt;br/&gt;&lt;small&gt;nada é duplicado&lt;/small&gt;&quot;]
+
+    R --&gt; D
+    A --&gt; D
+    I --&gt; D
+    D -- &quot;não&quot; --&gt; CORPUS
+    D -- &quot;sim&quot; --&gt; DESC
+    CORPUS --&gt; AP{&quot;Aprovada por&lt;br/&gt;um sênior?&quot;}
+    AP -- &quot;não&quot; --&gt; ESP[&quot;Espera revisão em /corpus&lt;br/&gt;&lt;small&gt;não treina, não se perde&lt;/small&gt;&quot;]
+    ESP -- &quot;o sênior aprova&quot; --&gt; AP
+    AP -- &quot;sim&quot; --&gt; P[&quot;dividir()&lt;br/&gt;&lt;small&gt;estratifica o corpus APROVADO, antes de cada treino&lt;/small&gt;&quot;]
+    P --&gt; CORPUS
+
+    classDef banco fill:#fff,stroke:#b6bfcd,stroke-dasharray:5 4;
+    classDef nao fill:#fbe9e8,stroke:#b3261e;
+    class CORPUS banco;
+    class DESC nao;
+    classDef aviso fill:#fdf1e3,stroke:#b0561a;
+    class ESP aviso;</pre></div>
+<p><strong>Por que a verificação de repetição.</strong> A mesma notícia chega por mais de uma porta — o analista rotula na fila e depois aprova a ocorrência feita dela. Sem a comparação por <code>impressao</code> (sha1 do texto normalizado), o mesmo exemplo entraria duas vezes e poderia cair <strong>em treino e em teste ao mesmo tempo</strong>. Isso é vazamento: a métrica sobe sem o modelo melhorar.</p>
+<p><strong>Por que a partição é atribuída em LOTE, e não na inserção.</strong> A notícia nasce com <code>particao</code> em branco e quem a preenche é <code>dividir()</code>, que o treino chama sozinho quando encontra exemplo pendente — ninguém precisa clicar em &quot;sortear&quot;.</p>
+<p>Sortear na hora de inserir foi tentado e é <strong>pior</strong>, por um motivo que só aparece medindo: a estratificação olha quanto falta de cada indicador para equilibrar as três partições, e uma notícia por vez não tem esse panorama. Na medição, três classes ficaram sem nenhum exemplo na validação e o teste ficou sem nenhum exemplo negativo. Em lote, o algoritmo começa sempre pelo indicador com menos exemplos ainda por distribuir, e é isso que garante exemplo de cada um nas três partições.</p>
+<p>A divisão feita fica <strong>gravada no banco</strong>: refazer o sorteio a cada treino mudaria o conjunto de teste e tornaria dois modelos incomparáveis.</p>
+<p><strong>Rótulo vazio é rótulo.</strong> A notícia lida e sem nenhum indicador é o exemplo negativo, e sem ele o modelo nunca aprende a recusar o que está fora do escopo. A coluna <code>rotulada</code> existe só para distinguir &quot;li e não há nada&quot; de &quot;ninguém olhou ainda&quot;.</p>
+<p><strong>Rotulado não é aprovado, e só o aprovado treina.</strong> <code>aprovada</code> é a segunda coluna, e a razão dela é a divisão de trabalho real: quem cadastra a ocorrência é o analista júnior, quem revisa é o sênior. Um rótulo errado do júnior não produz um erro visível — produz um modelo pior, errando em notícia que ninguém está olhando. É o defeito que não aparece em tela nenhuma, e por isso a trava fica na consulta de treino (<code>corpus.TREINAVEL</code>), escrita uma vez só: espalhar <code>rotulada = 1</code> por sete consultas é o que permitia esquecer uma.</p>
+<p>Mudar o rótulo derruba a aprovação e libera a vaga de partição — rótulo novo é afirmação nova, e um exemplo que saiu do treino não guarda lugar reservado.</p>
+<p><strong>E o treino só roda com 30 positivos aprovados de CADA classe</strong> (<code>corpus.MINIMO_POR_CLASSE</code>), na tela e na linha de comando. Antes isso era um aviso, e o que ele deixava passar era pior que o incômodo da trava: uma classe com 2 exemplos — ou com zero, num indicador recém-criado — treinava para dizer sempre não e saía com F1 0, que parece defeito do modelo e é falta de dado. A saída, quando uma classe rara segura o resto, é <code>rodar_treino.py --classe</code>, que aplica a mesma trava só ao subconjunto pedido.</p>
+<h2>2. O treinamento, passo a passo</h2>
+<div class="diagrama"><pre class="mermaid">flowchart TD
+    START[&quot;/modelos · Treinar agora&quot;]
+    SUB[&quot;Subprocesso em segundo plano&lt;br/&gt;&lt;small&gt;rodar_treino.py&lt;/small&gt;&quot;]
+    PRONTO{&quot;Prontidão:&lt;br/&gt;3+ exemplos por classe?&quot;}
+    PARA[&quot;Recusa e diz o que falta&quot;]
+
+    DIV[&quot;Divisão 70/15/15&lt;br/&gt;&lt;small&gt;só o que ainda não tem partição&lt;/small&gt;&quot;]
+    LER[&quot;Lê treino, validação e teste&lt;br/&gt;&lt;small&gt;só rotulada = 1&lt;/small&gt;&quot;]
+    COD[&quot;Codifica: lista de nomes → vetor de 0 e 1&quot;]
+
+    LOOP[&quot;Para cada UNIDADE a treinar&quot;]
+    PESO[&quot;Calcula pos_weight&lt;br/&gt;&lt;small&gt;negativos ÷ positivos, teto 10&lt;/small&gt;&quot;]
+    FIT[&quot;Ajusta a rede&lt;br/&gt;&lt;small&gt;AdamW · warmup 10% · BCEWithLogitsLoss&lt;/small&gt;&quot;]
+    PROB[&quot;Guarda as PROBABILIDADES&lt;br/&gt;&lt;small&gt;validação e teste&lt;/small&gt;&quot;]
+    FREE[&quot;Descarta a rede da memória&quot;]
+
+    CAL[&quot;Calibra o limiar de cada indicador&lt;br/&gt;&lt;small&gt;na VALIDAÇÃO&lt;/small&gt;&quot;]
+    MED[&quot;Mede no TESTE&lt;br/&gt;&lt;small&gt;F1 macro, micro, por indicador&lt;/small&gt;&quot;]
+    CMP[&quot;Compara com o corte fixo 0,5&quot;]
+    REG[(&quot;treino_execucao&lt;br/&gt;&lt;small&gt;métricas · hiperparâmetros · duração&lt;/small&gt;&quot;)]
+    SEL{&quot;Melhor F1 macro&lt;br/&gt;NA VALIDAÇÃO&quot;}
+    SALVA[&quot;Retreina a vencedora e grava os pesos&lt;br/&gt;&lt;small&gt;+ modelo.json&lt;/small&gt;&quot;]
+
+    START --&gt; SUB --&gt; PRONTO
+    PRONTO -- &quot;não&quot; --&gt; PARA
+    PRONTO -- &quot;sim&quot; --&gt; DIV --&gt; LER --&gt; COD --&gt; LOOP
+    LOOP --&gt; PESO --&gt; FIT --&gt; PROB --&gt; FREE
+    FREE -- &quot;próxima unidade&quot; --&gt; LOOP
+    FREE -- &quot;acabaram&quot; --&gt; CAL --&gt; MED --&gt; CMP --&gt; REG --&gt; SEL --&gt; SALVA
+
+    classDef modelo fill:#e4edf8,stroke:#1f5fa8,stroke-width:2px;
+    classDef banco fill:#fff,stroke:#b6bfcd,stroke-dasharray:5 4;
+    classDef nao fill:#fbe9e8,stroke:#b3261e;
+    class FIT modelo;
+    class REG banco;
+    class PARA nao;</pre></div>
+<h3>Por que cada passo está ali</h3>
+<p><strong>Subprocesso em segundo plano.</strong> O treino leva minutos e carrega um BERT inteiro. Dentro da requisição, ele penduraria o navegador e derrubaria o servidor junto se estourasse a memória. Em processo separado, a aplicação segue respondendo e um treino que falha morre sozinho.</p>
+<p><strong>Prontidão antes de tudo.</strong> São precisos ao menos 3 exemplos da classe mais rara — um para cada partição. Abaixo de 30, a métrica daquela classe é ruído: com 4 exemplos no teste, acertar 3 ou 4 move o recall de 0,75 para 1,00. O número não trava nada, só avisa.</p>
+<p><strong>Divisão 70/15/15, e só do que falta.</strong> Resortear tudo a cada treino mudaria o conjunto de teste, e dois modelos medidos em testes diferentes não são comparáveis — um modelo avaliado na semana passada teria sido medido num teste que já não existe. A estratificação é por classe e uma notícia por vez, começando pela <strong>mais rara</strong>: é o que garante exemplo dela nas três partições. Sem exemplo na validação não há limiar para calibrar; sem exemplo no teste não há métrica para reportar.</p>
+<p><strong>Codificação em vetor.</strong> Lista de nomes vira vetor de 0 e 1, uma posição por indicador. É multirrótulo, não multiclasse: a pergunta não é &quot;qual é o indicador desta notícia&quot; e sim &quot;quais destes oito ela sustenta&quot;. Vetor todo zero é o exemplo negativo, e é válido.</p>
+<p><strong><code>pos_weight</code> na perda.</strong> Com 20 exemplos de um indicador contra 400 sem ele, a perda não ponderada é quase minimizada por um modelo que <strong>nunca o marca</strong> — e o sintoma disso é o clássico &quot;só sai um indicador&quot;. O peso é a razão entre negativos e positivos, com teto de 10 para que uma classe com 2 exemplos não domine o gradiente.</p>
+<p><strong>A rede devolve probabilidade, não decisão.</strong> O corte vem depois, da calibração. É isso que permite medir o mesmo modelo com cortes diferentes sem retreinar.</p>
+<p><strong>Descartar a rede antes da próxima.</strong> É o que torna possível treinar as 24 redes do cluster numa placa de 8 GB: só uma vive por vez.</p>
+<p><strong>Calibrar na VALIDAÇÃO, medir no TESTE.</strong> Cortar todo mundo em 0,5 é palpite: a saída de um indicador raro costuma ficar abaixo disso mesmo quando é o rótulo certo, e aí ele nunca aparece. Cada indicador recebe o limiar que maximiza o F1 *dele* na validação. Calibrar no teste inflaria o número que vai para a banca. Empate fica com o limiar mais baixo de propósito: aqui um falso positivo é descartável — a LLM recebe o bloco daquela classe e pode descartá-la — enquanto um falso negativo é perda definitiva, porque a classe que o BERT não marcou nem chega a ser avaliada.</p>
+<p><strong>A comparação com 0,5.</strong> As métricas trazem também o F1 que o *mesmo* modelo teria com todos os cortes em 0,5. A diferença entre os dois é o efeito medido da calibração — não uma afirmação de que ela ajuda.</p>
+<p><strong>Seleção pela validação.</strong> O melhor é escolhido pelo F1 macro na validação, não no teste. Escolher pelo teste seria usá-lo duas vezes e o número deixaria de ser estimativa limpa.</p>
+<p><strong>Retreinar a vencedora para gravar.</strong> As execuções da grade rodam sem salvar pesos; só a vencedora é refeita com <code>salvar_modelo=True</code>. É o preço de não guardar um checkpoint de cada execução — com 4 configurações × 3 modelos, seria muito disco para jogar fora.</p>
+<h2>3. As três estratégias</h2>
+<p>O que muda entre elas é só o que conta como <strong>unidade</strong> no laço acima.</p>
+<div class="diagrama"><pre class="mermaid">flowchart TD
+    U[&quot;unico&lt;br/&gt;&lt;small&gt;1 rede · 8 saídas sigmoide&lt;/small&gt;&quot;]
+    P[&quot;por_indicador&lt;br/&gt;&lt;small&gt;8 redes binárias&lt;/small&gt;&quot;]
+    C[&quot;cluster&lt;br/&gt;&lt;small&gt;24 redes · 3 modelos × 8 indicadores&lt;/small&gt;&quot;]
+
+    U --&gt; U1[&quot;encoder compartilhado:&lt;br/&gt;o que aprende sobre a língua&lt;br/&gt;serve a todos os indicadores&quot;]
+    P --&gt; P1[&quot;indicador raro não disputa&lt;br/&gt;capacidade com os frequentes;&lt;br/&gt;cada um com seu ponto de parada&quot;]
+    C --&gt; C1[&quot;votação: 2 de 3 classificam;&lt;br/&gt;1 voto vira alerta para&lt;br/&gt;uma pessoa&quot;]
+
+    classDef modelo fill:#e4edf8,stroke:#1f5fa8,stroke-width:2px;
+    class U,P,C modelo;</pre></div>
+<p>Qual é melhor é <strong>resultado medido</strong>, não palpite: <code>--estrategia todas</code> treina as três na mesma partição de teste, e é isso que responde a pergunta.</p>
+<h3>O voto do cluster</h3>
+<div class="diagrama"><pre class="mermaid">flowchart LR
+    T[&quot;Texto&quot;]
+    G[&quot;Carrega as 3 redes&lt;br/&gt;de UM indicador&lt;br/&gt;&lt;small&gt;~2,1 GB&lt;/small&gt;&quot;]
+    V{&quot;Quantas&lt;br/&gt;marcaram?&quot;}
+    Z[&quot;0 · ausente&quot;]
+    D[&quot;1 · ALERTA, uma pessoa verifica&quot;]
+    M[&quot;2 ou 3 · classificado&quot;]
+    N[&quot;Libera e passa&lt;br/&gt;ao próximo indicador&quot;]
+
+    T --&gt; G --&gt; V
+    V -- &quot;0&quot; --&gt; Z
+    V -- &quot;1&quot; --&gt; D
+    V -- &quot;2-3&quot; --&gt; M
+    Z --&gt; N
+    D --&gt; N
+    M --&gt; N
+
+    classDef duvida fill:#fbeedf,stroke:#b0561a,stroke-width:2px;
+    classDef nao fill:#fbe9e8,stroke:#b3261e;
+    class D duvida;
+    class Z nao;</pre></div>
+<p><strong>Por que um grupo de três por vez.</strong> As 24 redes somam ~17 GB em disco e não cabem juntas nos 8 GB da placa. Um grupo de três ocupa ~2,1 GB. O ciclo é por indicador porque o <strong>voto</strong> é por indicador: as três de um precisam estar vivas ao mesmo tempo para votar, as dos outros não. São oito ciclos de carga por notícia — mais lento, e é esse o preço de caber.</p>
+<p><strong>Por que cada rede tem o seu próprio limiar.</strong> Se as três compartilhassem o corte, discordariam menos por construção — e a discordância é justamente o sinal que manda o caso para uma pessoa.</p>
+<p><strong>Por que 2 de 3, e não unanimidade.</strong> O corte sai de <code>FRACAO_PARA_PROSSEGUIR = 2/3</code>, e é fração de propósito: cravado o número 3, as estratégias de UMA rede — <code>unico</code> e <code>por_indicador</code> — nunca passariam, e a LLM jamais seria chamada nelas. Em 1 de 1 a fração dá 1 voto, que é o comportamento certo.</p>
+<p>Unanimidade ficou de fora porque ela custa recall, e aqui o falso positivo é descartável: a LLM recebe o bloco daquela classe e pode descartá-la. O falso negativo, não — a notícia vai para o arquivo e ninguém mais a vê.</p>
+<p>As métricas do cluster deixam a escolha auditável, com os três cortes medidos no MESMO teste: <code>com_um_voto</code> (1 voto), o número principal (2 de 3) e <code>com_unanimidade</code> (3 de 3). <code>revisao_humana</code> é a fração de decisões que ficou com 1 voto e precisa de pessoa. Sem esses números, o corte seria palpite.</p>
+<h2>4. O ciclo da aprovação</h2>
+<p>Existe, e é a segunda porta do diagrama 1. Passo a passo:</p>
+<div class="diagrama"><pre class="mermaid">flowchart TD
+    A[&quot;Sênior clica em Aprovar&lt;br/&gt;&lt;small&gt;caixa &#x27;servir de treino&#x27; marcada&lt;/small&gt;&quot;]
+    AL{&quot;Há alerta de&lt;br/&gt;duplicidade aberto?&quot;}
+    BLOQ[&quot;Recusa: resolva o alerta antes&quot;]
+    ST[&quot;Grava status = aprovado&lt;br/&gt;&lt;small&gt;quem aprovou, quando, observação&lt;/small&gt;&quot;]
+    FEN[&quot;Lê os fenômenos CONFIRMADOS&lt;br/&gt;da ocorrência&quot;]
+    FILTRO[&quot;Mantém só as classes do BERT&lt;br/&gt;&lt;small&gt;descarta as derivadas de regra&lt;/small&gt;&quot;]
+    EACH[&quot;Para cada notícia da ocorrência&quot;]
+    DUP{&quot;Texto já&lt;br/&gt;no corpus?&quot;}
+    PULA[&quot;Conta como repetida&quot;]
+    INS[&quot;Grava no corpus&lt;br/&gt;&lt;small&gt;rotulada = 1 · aprovada = 1&lt;/small&gt;&quot;]
+    MSG[&quot;Avisa quantas foram e com quais rótulos&quot;]
+
+    A --&gt; AL
+    AL -- &quot;sim&quot; --&gt; BLOQ
+    AL -- &quot;não&quot; --&gt; ST --&gt; FEN --&gt; FILTRO --&gt; EACH --&gt; DUP
+    DUP -- &quot;sim&quot; --&gt; PULA
+    DUP -- &quot;não&quot; --&gt; INS
+    PULA --&gt; MSG
+    INS --&gt; MSG
+
+    classDef nao fill:#fbe9e8,stroke:#b3261e;
+    class BLOQ,PULA nao;</pre></div>
+<h3>Por que cada passo está ali</h3>
+<p><strong>Tudo na mesma transação.</strong> A gravação do status e o envio ao corpus são uma operação só. Não pode existir registro aprovado sem o exemplo de treino correspondente — se o segundo falhar, o primeiro também desfaz.</p>
+<p><strong>Só as classes do BERT viram rótulo.</strong> Hoje a única de fora é <code>chacina</code>, que existe apenas como regra sobre a lista de vítimas. Ensiná-la ao classificador seria pedir que ele adivinhasse do texto algo que a contagem já sabe de forma exata, e criar uma segunda resposta capaz de contradizer a primeira.</p>
+<p><code>vitimizacao_policial</code> já esteve nesse grupo e <strong>saiu dele</strong> em 09/10: ela tem classe de BERT e regra. O motivo é o portão da LLM — a regra roda DEPOIS da LLM, e o portão acontece ANTES, então policial baleado de folga não disparava classe nenhuma e ia para o arquivo em silêncio.</p>
+<p><strong>Uma linha de corpus por notícia, não por ocorrência.</strong> Em produção o BERT lê <strong>uma notícia de cada vez</strong>; treiná-lo com várias notícias concatenadas ensinaria um formato que ele nunca vai encontrar.</p>
+<p><strong>Limite conhecido e assumido.</strong> O rótulo é da *ocorrência*, e cada notícia recebe o conjunto inteiro. Numa ocorrência com várias fontes, uma notícia curta pode receber uma classe que ela sozinha não sustenta — uma que não menciona a polícia receberia <code>acao_policial</code> assim mesmo. Por isso elas entram editáveis em <code>/corpus</code>, e não como verdade intocável.</p>
+<p><strong>Reaprovar não duplica.</strong> A verificação por impressão faz a segunda aprovação não acrescentar nada, e a mensagem diz quantas já estavam lá.</p>
+<p><strong>Esta é a única porta que já entra aprovada</strong>, e é para isso que ela existe: quem aprova a ocorrência é o sênior que revisou o trabalho do júnior, então a decisão dele é a assinatura que o treino exige. Desmarcar a caixa *servir de exemplo de treino* grava a notícia sem a assinatura, em vez de não gravar — serve ao registro que está certo mas é exemplo ruim: texto truncado, duas ocorrências misturadas, fonte duvidosa.</p>
+<h2>5. O ciclo inteiro, de volta ao começo</h2>
+<div class="diagrama"><pre class="mermaid">flowchart LR
+    N[&quot;Notícia chega&quot;] --&gt; F[&quot;Fila de recebidas&quot;]
+    F --&gt; B{&quot;BERT marcou?&quot;}
+    B -- &quot;não há modelo&quot; --&gt; H[&quot;Analista rotula&quot;]
+    B -- &quot;0 voto em tudo&quot; --&gt; ARQ[&quot;Arquivo&lt;br/&gt;&lt;small&gt;acervo, sem LLM&lt;/small&gt;&quot;]
+    B -- &quot;1 voto&quot; --&gt; H
+    B -- &quot;no corte ou acima&quot; --&gt; O[&quot;Vira ocorrência&quot;]
+    H --&gt; CO[(&quot;corpus&quot;)]
+    H -- &quot;tem fenômeno&quot; --&gt; O
+    ARQ -- &quot;modelo novo:&lt;br/&gt;reavaliar o arquivo&quot; --&gt; B
+    O --&gt; L[&quot;LLM aprofunda&lt;br/&gt;&lt;small&gt;só os blocos marcados&lt;/small&gt;&quot;]
+    L --&gt; AP[&quot;Analista confere e aprova&quot;]
+    AP --&gt; CO
+    CO --&gt; TR[&quot;Treino&quot;]
+    TR -- &quot;modelo novo&quot; --&gt; B
+
+    classDef banco fill:#fff,stroke:#b6bfcd,stroke-dasharray:5 4;
+    classDef modelo fill:#e4edf8,stroke:#1f5fa8,stroke-width:2px;
+    classDef frio fill:#eef0f3,stroke:#6b7584;
+    class CO banco;
+    class B,TR modelo;
+    class ARQ frio;</pre></div>
+<p>As duas setas que chegam no corpus são as duas portas: a rotulagem na fila (inclusive a que conclui &quot;não há fenômeno&quot;) e a aprovação da ocorrência. As duas alimentam o mesmo treino, e o modelo que sai dele volta para o começo.</p>
+<p><strong>O que esse ciclo compra além do treino.</strong> Enquanto o BERT não marca nada, a chamada à LLM leva o catálogo inteiro de indicadores: ~6.750 tokens de prompt, contra um teto de 8.000 por minuto — e o texto da notícia ainda entra em cima disso. Com o BERT marcando duas classes, o prompt cai para ~4.620, e com nenhuma, para ~3.540. É essa folga que permite subir o <code>reasoning_effort</code> da LLM, que é o que estabiliza a extração da lista de vítimas: medido em três leituras do mesmo texto, <code>low</code> devolveu 2, 0 e 1 vítima, e <code>medium</code> devolveu 2, 2 e 2. O corpus não serve só ao BERT — ele é o que torna a chamada da LLM melhor.</p>
+</main>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  const escuro = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: escuro ? "dark" : "default",
+    flowchart: { useMaxWidth: true, htmlLabels: true },
+  });
+</script>
+</html>

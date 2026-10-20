@@ -2,14 +2,39 @@
 
 {% block conteudo %}
 <h1>Abertura da ocorrência</h1>
-<p class="suave">Etapa 1: informe a data e o endereço. As notícias entram na tela seguinte.</p>
+<p class="suave">
+  Informe a data, a hora (se houver) e o endereço. O código do caso, a data do
+  registro e a faixa horária são preenchidos pelo sistema. As notícias entram
+  na tela seguinte.
+</p>
 
 <div class="cartao">
+  {% if da_fila %}
+    <p class="aviso aviso-ok">
+      Vinda da fila de recebidas (#{{ da_fila.id }}). O texto já está na mão e
+      vai ser anexado sozinho — aqui falta só o endereço.
+      {% if da_fila.indicadores %}
+        Indicadores já rotulados:
+        {% for slug in da_fila.indicadores %}<span class="etiqueta">{{ slug }}</span>{% endfor %}
+      {% endif %}
+    </p>
+    <details style="margin-bottom:12px">
+      <summary>Texto da notícia ({{ da_fila.texto|length }} caracteres)</summary>
+      <p class="suave">{{ da_fila.texto }}</p>
+    </details>
+  {% endif %}
+
   <form method="post">
+    {% if da_fila %}<input type="hidden" name="recebida_id" value="{{ da_fila.id }}">{% endif %}
     <div class="linha">
       <div>
-        <label for="data_fato">Data do fato</label>
-        <input type="date" id="data_fato" name="data_fato" required>
+        <label for="data_caso">Data do caso</label>
+        <input type="date" id="data_caso" name="data_caso" required max="{{ hoje }}"
+               value="{{ da_fila.data_noticia if da_fila and da_fila.data_noticia else '' }}">
+      </div>
+      <div>
+        <label for="hora_caso">Hora aproximada (opcional)</label>
+        <input type="time" id="hora_caso" name="hora_caso">
       </div>
       <div>
         <label for="analista">Analista</label>
@@ -19,10 +44,16 @@
 
     <div class="linha" style="margin-top:12px">
       <div>
-        <label for="cidade">Cidade</label>
-        <select id="cidade" name="cidade" required>
+        <label for="estado">Estado</label>
+        <select id="estado" name="estado" required>
           <option value="">Selecione</option>
-          {% for cidade in locais %}<option value="{{ cidade }}">{{ cidade }}</option>{% endfor %}
+          {% for s, nome in estados %}<option value="{{ s }}">{{ s }} — {{ nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="cidade">Cidade</label>
+        <select id="cidade" name="cidade" required disabled>
+          <option value="">Selecione o estado primeiro</option>
         </select>
       </div>
       <div>
@@ -31,36 +62,79 @@
           <option value="">Selecione a cidade primeiro</option>
         </select>
       </div>
+    </div>
+
+    <div class="linha" style="margin-top:12px">
       <div>
         <label for="localidade">Localidade (opcional)</label>
-        <input id="localidade" name="localidade" placeholder="Rua, comunidade, ponto de referência">
+        <input id="localidade" name="localidade" placeholder="Sub-bairro, favela, conjunto habitacional">
       </div>
     </div>
 
     <p class="suave" style="margin-top:12px">
-      Cidade e bairro vêm de listas fixas: grafias diferentes para o mesmo lugar
-      quebrariam o alerta de duplicidade e as estatísticas.
+      Estado, cidade e bairro vêm de listas fixas: grafias diferentes para o
+      mesmo lugar quebrariam o alerta de duplicidade e as estatísticas. O estado
+      é escolhido primeiro porque 232 nomes de município se repetem entre
+      estados — “Bom Jesus” existe em cinco. Falta um bairro?
+      <a href="{{ url_for('locais_e_listas') }}">cadastre em Locais</a>.
+      Sem hora, a faixa horária fica <strong>Não identificado</strong> — nunca
+      chutada.
     </p>
 
-    <button type="submit" style="margin-top:8px">Abrir ocorrência</button>
+    <div class="acoes">
+      <button type="submit">Abrir ocorrência</button>
+    </div>
   </form>
 </div>
 
 <script>
-  const bairrosPorCidade = {{ locais|tojson }};
+  // As listas são pedidas sob demanda: 5.571 municípios embutidos na página
+  // seriam ~250 KB em cada carregamento, e o navegador só precisa dos de um
+  // estado por vez.
+  const estado = document.getElementById("estado");
   const cidade = document.getElementById("cidade");
   const bairro = document.getElementById("bairro");
 
-  cidade.addEventListener("change", () => {
-    const lista = bairrosPorCidade[cidade.value] || [];
-    bairro.innerHTML = '<option value="">Selecione</option>';
+  function preencher(campo, lista, vazio) {
+    campo.innerHTML = "";
+    const inicial = document.createElement("option");
+    inicial.value = "";
+    inicial.textContent = lista.length ? "Selecione" : vazio;
+    campo.appendChild(inicial);
     for (const nome of lista) {
       const opcao = document.createElement("option");
       opcao.value = nome;
       opcao.textContent = nome;
-      bairro.appendChild(opcao);
+      campo.appendChild(opcao);
     }
-    bairro.disabled = lista.length === 0;
+    campo.disabled = lista.length === 0;
+  }
+
+  estado.addEventListener("change", async () => {
+    preencher(bairro, [], "Selecione a cidade primeiro");
+    if (!estado.value) {
+      preencher(cidade, [], "Selecione o estado primeiro");
+      return;
+    }
+    cidade.disabled = true;
+    const r = await fetch(`/locais/cidades/${encodeURIComponent(estado.value)}`);
+    preencher(cidade, (await r.json()).cidades, "Nenhuma cidade cadastrada");
+  });
+
+  cidade.addEventListener("change", async () => {
+    if (!cidade.value) {
+      preencher(bairro, [], "Selecione a cidade primeiro");
+      return;
+    }
+    const r = await fetch(
+      `/locais/bairros/${encodeURIComponent(estado.value)}/${encodeURIComponent(cidade.value)}`
+    );
+    // Cidade sem bairro cadastrado não trava o registro: o campo deixa de ser
+    // obrigatório e a ocorrência grava com o bairro em branco, para o analista
+    // cadastrá-lo depois em Locais.
+    const lista = (await r.json()).bairros;
+    preencher(bairro, lista, "Sem bairro cadastrado — cadastre em Locais");
+    bairro.required = lista.length > 0;
   });
 </script>
 {% endblock %}

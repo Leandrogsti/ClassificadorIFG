@@ -39,7 +39,7 @@
       </select>
     </div>
     <div style="align-self:end" class="linha">
-      <button type="submit">Buscar</button>
+      <button type="submit" class="secundario">Buscar</button>
       {% if de or ate or status_filtro %}
         <a href="{{ url_for('inicio') }}"><button class="secundario" type="button">Limpar</button></a>
       {% endif %}
@@ -51,7 +51,8 @@
   {% if not ocorrencias %}
     <p class="suave">Nenhuma ocorrência ainda. Comece abrindo uma nova.</p>
   {% else %}
-  <table>
+  <div class="rolagem">
+<table>
     <thead>
       <tr>
         <th>#</th><th>Data do fato</th><th>Local</th><th>Indicadores</th>
@@ -62,11 +63,11 @@
       {% for o in ocorrencias %}
       <tr>
         <td><a href="{{ url_for('ocorrencia', ocorrencia_id=o.id) }}">{{ o.id }}</a></td>
-        <td>{{ o.data_fato }}</td>
+        <td>{{ o.data_caso }}</td>
         <td>{{ o.cidade }} — {{ o.bairro }}{% if o.localidade %}<br><span class="suave">{{ o.localidade }}</span>{% endif %}</td>
         <td>
-          {% for i in o.indicadores %}<span class="etiqueta">{{ rotulos_indicadores.get(i, i) }}</span>{% endfor %}
-          {% if not o.indicadores %}<span class="suave">—</span>{% endif %}
+          {% for i in o.fenomenos %}<span class="etiqueta">{{ rotulos_fenomeno.get(i, i) }}</span>{% endfor %}
+          {% if not o.fenomenos %}<span class="suave">—</span>{% endif %}
         </td>
         <td>{{ o.total_noticias }}</td>
         <td>{{ o.total_vitimas }}</td>
@@ -75,6 +76,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% endif %}
 </div>
 

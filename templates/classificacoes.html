@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<div class="entre">
+  <div>
+    <h1>Classificações do BERT</h1>
+    <p class="suave">
+      Tudo que o classificador marcou, com o link, o texto e a confiança de cada
+      classe, gravado <strong>antes</strong> de a LLM ver qualquer coisa. Sem
+      este registro o erro do modelo some assim que a LLM o corrige, e nunca se
+      saberia qual classe precisa de mais exemplos.
+    </p>
+  </div>
+</div>
+
+{% if origem_modelo %}
+  <p class="suave">Respondendo: {{ origem_modelo }}</p>
+{% else %}
+  <p class="aviso aviso-aviso">
+    Não há modelo treinado, então nada está sendo <strong>marcado</strong>. Os
+    textos que entram continuam sendo <strong>guardados</strong> no banco de
+    entradas abaixo, à espera do primeiro treino — nenhum se perde.
+    <a href="{{ url_for('corpus_repositorio') }}">Rotule notícias no corpus</a> e
+    rode <code>python rodar_treino.py --dividir</code>.
+  </p>
+{% endif %}
+
+<div class="cartao">
+  <h2>Banco de entradas — tudo que entrou</h2>
+  <p class="suave">
+    Todo texto submetido ganha uma linha aqui <strong>antes</strong> de qualquer
+    classificação, e uma linha por indicador encontrado. Uma notícia com quatro
+    indicadores tem quatro linhas ligadas a ela; uma notícia sem nenhum tem zero
+    — e continua guardada. É o que separa <em>"o classificador leu e não achou
+    nada"</em> de <em>"ninguém leu ainda"</em>.
+  </p>
+  <div class="linha">
+    <div class="indicador-caixa">
+      <span class="numero">{{ entradas.total }}</span>
+      <span class="suave">textos recebidos</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ entradas.classificadas }}</span>
+      <span class="suave">com ao menos um indicador</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ entradas.sem_indicador }}</span>
+      <span class="suave">lidos, nenhum indicador</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero {{ 'sem-suporte' if entradas.sem_modelo }}">{{ entradas.sem_modelo }}</span>
+      <span class="suave">à espera de um modelo</span>
+    </div>
+  </div>
+  {% if entradas.por_indicador %}
+  <div class="rolagem">
+<table style="margin-top:12px">
+    <thead><tr><th>Indicador</th><th>Entradas classificadas com ele</th></tr></thead>
+    <tbody>
+      {% for nome, n in entradas.por_indicador.items() %}
+      <tr>
+        <td>{{ entradas.rotulos.get(nome, nome) }} <code class="suave">{{ nome }}</code></td>
+        <td>{{ n }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="suave" style="margin-top:8px">
+    A soma desta coluna é maior que o total de entradas, e tem de ser: a mesma
+    notícia conta em cada indicador que recebeu.
+  </p>
+  {% endif %}
+  {% if entradas.sem_modelo %}
+  <p class="aviso aviso-aviso" style="margin-top:10px">
+    {{ entradas.sem_modelo }} texto(s) entraram antes de existir modelo treinado.
+    Estão guardados e nunca passaram pelo classificador — depois do primeiro
+    treino valem como fila de reprocessamento.
+  </p>
+  {% endif %}
+</div>
+
+<div class="cartao">
+  <h2>Situação</h2>
+  <div class="linha">
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.total }}</span>
+      <span class="suave">classificações</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.revisadas }}</span>
+      <span class="suave">conferidas</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.pendentes }}</span>
+      <span class="suave">por conferir</span>
+    </div>
+    <div class="indicador-caixa">
+      <span class="numero">{{ estatisticas.divergentes }}</span>
+      <span class="suave">em que o modelo errou</span>
+    </div>
+  </div>
+
+  {% if estatisticas.divergentes %}
+    <h3 style="margin-top:16px">Onde o modelo erra</h3>
+    <div class="rolagem">
+<table>
+      <thead>
+        <tr>
+          <th>Classe</th>
+          <th title="A classe se aplicava e o modelo não marcou">Faltou marcar</th>
+          <th title="O modelo marcou e a classe não se aplicava">Marcou à toa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nome, e in estatisticas.erros.items() %}
+          {% if e.faltou or e.sobrou %}
+          <tr>
+            <td>{{ estatisticas.rotulos.get(nome, nome) }}</td>
+            <td>{{ e.faltou or '—' }}</td>
+            <td>{{ e.sobrou or '—' }}</td>
+          </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="suave" style="margin-top:8px">
+      <strong>Faltou marcar</strong> costuma ser falta de exemplo daquela classe
+      no corpus. <strong>Marcou à toa</strong> costuma ser limiar baixo demais, ou
+      exemplos positivos parecidos demais com os negativos. Em qualquer dos
+      casos, enviar a revisão ao corpus é o que corrige.
+    </p>
+  {% endif %}
+</div>
+
+<div class="cartao">
+  <div class="entre">
+    <h2>Registros</h2>
+    <span class="suave">{{ total }} resultado(s){% if total %} · página {{ pagina }} de {{ paginas }}{% endif %}</span>
+  </div>
+
+  <form method="get" class="linha" style="margin-bottom:14px">
+    <div>
+      <label for="f_revisado">Conferência</label>
+      <select id="f_revisado" name="revisado">
+        <option value="">Todas</option>
+        <option value="nao" {% if filtros.revisado == 'nao' %}selected{% endif %}>Por conferir</option>
+        <option value="sim" {% if filtros.revisado == 'sim' %}selected{% endif %}>Conferidas</option>
+        <option value="errada" {% if filtros.revisado == 'errada' %}selected{% endif %}>Só em que o modelo errou</option>
+      </select>
+    </div>
+    <div>
+      <label for="f_classe">Classe marcada</label>
+      <select id="f_classe" name="classe">
+        <option value="">Todas</option>
+        {% for i in catalogo %}
+          <option value="{{ i.nome }}" {% if filtros.classe == i.nome %}selected{% endif %}>{{ i.rotulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="f_origem">Origem</label>
+      <select id="f_origem" name="origem">
+        <option value="">Todas</option>
+        <option value="producao" {% if filtros.origem == 'producao' %}selected{% endif %}>Produção</option>
+        <option value="playground" {% if filtros.origem == 'playground' %}selected{% endif %}>Playground</option>
+      </select>
+    </div>
+    <div style="flex:2">
+      <label for="f_busca">Buscar no texto ou no link</label>
+      <input id="f_busca" name="busca" value="{{ filtros.busca }}">
+    </div>
+    <div style="align-self:end" class="linha">
+      <button type="submit" class="secundario">Buscar</button>
+      {% if filtros_ativos %}
+        <a href="{{ url_for('classificacoes') }}"><button class="secundario" type="button">Limpar</button></a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if not registros %}
+    <p class="suave">Nenhuma classificação com esses filtros.</p>
+  {% endif %}
+
+  {% for r in registros %}
+    {% set corrigidas = r.classes_corrigidas if r.classes_corrigidas is not none else r.classes %}
+    <div class="cartao" style="background:#fbfcfd">
+      <div class="entre">
+        <h3 style="margin:0">
+          #{{ r.id }}
+          <span class="suave">{{ r.criado_em[:16].replace('T', ' ') }} · {{ r.origem }}</span>
+          {% if r.revisado %}
+            {% if r.classes | sort == corrigidas | sort %}
+              <span class="etiqueta regra">conferida, modelo acertou</span>
+            {% else %}
+              <span class="etiqueta" style="background:#fbe9e8; color:#7d1a15">conferida, modelo errou</span>
+            {% endif %}
+          {% else %}
+            <span class="etiqueta">por conferir</span>
+          {% endif %}
+          {% if r.enviada_ao_corpus %}
+            <a href="{{ url_for('corpus_noticia', noticia_id=r.enviada_ao_corpus) }}">
+              <span class="etiqueta texto">no corpus #{{ r.enviada_ao_corpus }}</span>
+            </a>
+          {% endif %}
+        </h3>
+        {% if r.ocorrencia_id %}
+          <a href="{{ url_for('ocorrencia', ocorrencia_id=r.ocorrencia_id) }}">Ver a ocorrência</a>
+        {% endif %}
+      </div>
+
+      {% if r.link %}
+        <p class="suave" style="margin:6px 0">
+          <a href="{{ r.link }}" target="_blank" rel="noopener">{{ r.link[:90] }}</a>
+        </p>
+      {% endif %}
+
+      <details style="margin:8px 0">
+        <summary>Texto da notícia ({{ r.texto|length }} caracteres)</summary>
+        <div class="noticia-texto">{{ r.texto }}</div>
+      </details>
+
+      <p style="margin:6px 0">
+        <span class="suave">O BERT marcou:</span>
+        {% for nome in r.classes %}
+          <span class="etiqueta texto">{{ estatisticas.rotulos.get(nome, nome) }}
+            {{ '%.2f' | format(r.confiancas.get(nome, 0)) }}</span>
+        {% endfor %}
+        {% if not r.classes %}<span class="suave">nenhuma classe</span>{% endif %}
+      </p>
+
+      <details>
+        <summary>
+          Confiança de todas as classes
+          {% if r.limiar is not none %}
+            (limiar {{ '%.2f' | format(r.limiar) }} para todas)
+          {% elif r.limiares %}
+            (um limiar calibrado por classe)
+          {% endif %}
+        </summary>
+        <div class="rolagem">
+<table>
+          <thead>
+            <tr><th>Classe</th><th></th><th>Confiança</th><th>Limiar</th></tr>
+          </thead>
+          <tbody>
+            {% for nome, valor in r.confiancas | dictsort(by='value', reverse=true) %}
+            {% set corte = r.limiares.get(nome, r.limiar) %}
+            <tr>
+              <td style="width:240px">{{ estatisticas.rotulos.get(nome, nome) }}</td>
+              <td>
+                <div class="barra">
+                  <span class="barra-preenchida {{ 'regra' if nome in r.classes }}"
+                        style="width: {{ 100 * valor }}%"></span>
+                </div>
+              </td>
+              <td style="width:60px; text-align:right">{{ '%.3f' | format(valor) }}</td>
+              <td class="suave" style="width:60px; text-align:right">
+                {% if corte is not none %}{{ '%.2f' | format(corte) }}{% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        <p class="suave" style="margin-top:8px">
+          A confiança ao lado do limiar é o que diz de quem é o erro. Classe
+          certa com 0,48 contra um corte de 0,50 é limiar; com 0,02, é falta de
+          exemplo daquela classe no corpus.
+        </p>
+      </details>
+
+      {% if not r.enviada_ao_corpus %}
+        <form method="post" style="margin-top:10px"
+              action="{{ url_for('classificacao_ao_corpus', registro_id=r.id) }}">
+          <button type="submit">Mandar ao corpus com estes rótulos</button>
+          <span class="suave">
+            Sem corrigir nada: é para quando o classificador acertou e o exemplo
+            serve de treino assim como está.
+          </span>
+        </form>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('revisar_classificacao', registro_id=r.id) }}"
+            style="margin-top:10px">
+        <label>Classificação correta</label>
+        <div class="grade-indicadores">
+          {% for i in catalogo %}
+            <label class="caixa {{ 'escolhida' if i.nome in corrigidas }}">
+              <span class="cabeca">
+                <input type="checkbox" name="classes" value="{{ i.nome }}"
+                       {% if i.nome in corrigidas %}checked{% endif %}>
+                {{ i.rotulo }}
+              </span>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="linha" style="margin-top:10px">
+          <div style="flex:2">
+            <label>Observação (opcional)</label>
+            <input name="observacao" value="{{ r.observacao or '' }}"
+                   placeholder="Por que o modelo errou, se souber dizer">
+          </div>
+          <div style="align-self:end" class="linha">
+            <button type="submit">Salvar conferência</button>
+            {% if not r.enviada_ao_corpus %}
+              <button type="submit" name="ao_corpus" value="1" class="secundario">
+                Salvar e enviar ao corpus
+              </button>
+            {% endif %}
+          </div>
+        </div>
+        {% if r.revisado %}
+          <p class="suave">
+            Conferida por {{ r.revisor }} em {{ r.revisado_em[:16].replace('T', ' ') }}.
+            Corrigir aqui não altera a ocorrência — ela já foi classificada. O que
+            esta correção alimenta é o próximo treino.
+          </p>
+        {% endif %}
+      </form>
+    </div>
+  {% endfor %}
+</div>
+
+{% if paginas > 1 %}
+<div class="cartao paginacao">
+  {% if pagina > 1 %}
+    <a href="{{ url_for('classificacoes', pagina=pagina-1, **filtros_ativos) }}">← Anterior</a>
+  {% else %}<span class="suave">← Anterior</span>{% endif %}
+  <span class="suave">Página {{ pagina }} de {{ paginas }}</span>
+  {% if pagina < paginas %}
+    <a href="{{ url_for('classificacoes', pagina=pagina+1, **filtros_ativos) }}">Próxima →</a>
+  {% else %}<span class="suave">Próxima →</span>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

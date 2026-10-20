@@ -5,7 +5,15 @@ Uso: escreva/edite categorias em categorias_fonte.json com texto livre (definica
 e uma frase curta de desambiguacao (nao_e). Este script usa spaCy para extrair
 automaticamente as palavras-chave (gatilhos) de cada definicao, evitando que a
 descricao completa em prosa precise ir para o prompt (que e o que mais consome
-tokens na API). Para adicionar uma motivacao nova, edite o JSON e rode:
+tokens na API).
+
+ATENCAO: as CATEGORIAS DE MOTIVACAO que este script gerava sairam do sistema em
+2026-10-06 — o classificador registra fenomeno observado e circunstancia, e nada
+mais. O que ainda sai daqui e e usado em producao sao as secoes PAPEL e RECORTE
+DE ANALISE do prompt, lidas por `classificador._secoes_do_dicionario`. O resto
+do arquivo gerado permanece como registro do conceito.
+
+Para editar as secoes que ainda viajam no prompt, mexa no JSON e rode:
 
     python gerar_dicionario.py
 """
@@ -66,13 +74,13 @@ def montar_motivacoes_json(nomes: list[str]) -> str:
 
 
 TEMPLATE = """# PAPEL
-Você é analista de curadoria do Instituto Fogo Cruzado. A notícia recebida já foi confirmada como ocorrência com disparo de arma de fogo dentro do escopo do Dicionário de Dados do Fogo Cruzado. Sua única tarefa é classificar a MOTIVAÇÃO (campo "Motivo Principal", 2 níveis). Seja consistente: mesma dinâmica = mesma classificação. Baseie-se só no texto, sem inventar fatos. Responda SOMENTE com o JSON do FORMATO DE SAÍDA, sem texto antes/depois.
+Você é analista de curadoria do Instituto Fogo Cruzado. Um classificador BERT já leu a notícia e marcou quais indicadores se aplicam a ela. Você tem duas tarefas, nesta ordem: CONFIRMAR ou DESCARTAR cada indicador marcado e montar a LISTA DE VÍTIMAS. O sistema registra FENÔMENO OBSERVADO e CIRCUNSTÂNCIA, e nada mais — não há campo de motivação para preencher. Seja consistente: mesma dinâmica = mesma classificação. Baseie-se só no texto, sem inventar fatos. Responda SOMENTE com o JSON do FORMATO DE SAÍDA, sem texto antes/depois.
 
 # RECORTE DE ANÁLISE
 Classifique só pelo que envolveu DIRETAMENTE o disparo: quem atirou, contra quem e por quê, no momento do tiro. NÃO use:
 - Fatos ANTERIORES ao tiro que não causaram o tiro (histórico do envolvido, se já era investigado, se era "alvo de operação" em outro momento, antecedentes criminais).
 - Fatos POSTERIORES ao tiro que não são um novo disparo (polícia chegar depois para atender a ocorrência, socorrer vítima, apreender arma/corpo, levar para perícia ou delegacia, abrir inquérito, divulgar identidade).
-Um agente de segurança só conta para acao_operacao_policial se esteve presente e atuando NO MOMENTO do disparo (trocando tiros ou sendo alvo). Agente que chega depois só para constatar um crime já encerrado não conta, mesmo que a notícia cite operações, UPP ou unidades policiais em outro contexto.
+Um agente de segurança só conta para acao_policial se esteve presente e atuando NO MOMENTO do disparo (trocando tiros ou sendo alvo). Agente que chega depois só para constatar um crime já encerrado não conta, mesmo que a notícia cite operações, UPP ou unidades policiais em outro contexto.
 
 # DOIS NÍVEIS
 - PRINCIPAL: o fato que ORIGINOU os tiros (sempre exatamente 1). Pergunta-chave: "o que originou os tiros?"
@@ -121,7 +129,7 @@ Notas do formato:
 - Homem é morto a tiros após briga; polícia só chega depois para socorrer, apreender arma/corpo e abrir investigação (sem troca de tiros) → **briga** + compl. `homicidio_tentativa`; NÃO é acao_operacao_policial, mesmo citando UPP/operação contra tráfico em outro contexto.
 
 # INSTRUÇÃO FINAL
-Identifique o fato que originou os tiros (principal), depois os fatos que se somaram (complementares), preencha as {n} flags de motivação e devolva só o JSON.
+Confirme os indicadores, monte a lista de vítimas, identifique o fato que originou os tiros (principal), depois os fatos que se somaram (complementares), e devolva só o JSON.
 """
 
 

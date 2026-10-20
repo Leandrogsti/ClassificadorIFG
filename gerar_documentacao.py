@@ -1,11 +1,24 @@
-"""Gera a documentação de TCC em docx a partir das fontes reais do projeto.
+"""Gera a documentação de TCC em .docx a partir das fontes reais do projeto.
 
-As tabelas de apêndice saem de categorias_fonte.json, indicadores_fonte.json e
-do catálogo de modelos em treinamento.py, não de texto copiado à mão. Alterar
-uma categoria e regerar mantém o documento em dia com o sistema que ele
-descreve, em vez de deixar os dois divergirem em silêncio.
+POR QUE GERAR EM VEZ DE ESCREVER. As tabelas de apêndice saem de
+`indicadores_fonte.json` e do catálogo de modelos de `treinamento.py`, não de
+texto copiado à mão. Alterar um indicador e regerar mantém o documento em dia
+com o sistema que ele descreve, em vez de deixar os dois divergirem em silêncio
+— que é o destino de todo anexo copiado.
 
     python gerar_documentacao.py
+
+ESTRUTURA DO DOCUMENTO: resumo, introdução, justificativa, objetivos,
+fundamentação, método (corpus, anotação, treino, avaliação), resultados
+esperados, cronograma e apêndices. As funções de formatação (`sombrear`,
+`legenda`, `tabela`, `quebra`, `sumario`) existem porque python-docx não tem
+estilos de alto nível: cada tabela da ABNT é montada célula por célula.
+
+O QUE O DOCUMENTO DESCREVE, para não divergir do código: o sistema classifica
+FENÔMENO OBSERVADO da ocorrência e CIRCUNSTÂNCIA da vítima. Não há atribuição de
+motivação — ela saiu do sistema em 2026-10-06, e o texto deste arquivo foi
+revisado para refletir isso. Se você acrescentar uma seção aqui, confira contra
+`indicadores_fonte.json` e `prompts.py`, que são o que de fato roda.
 """
 import json
 from pathlib import Path
@@ -23,11 +36,14 @@ SAIDA.mkdir(exist_ok=True)
 
 import corpus as mod_corpus
 import treinamento as mod_treino
-import vocabulario as mod_vocab
 import indicadores as mod_ind
 
-CATEGORIAS = json.loads((PROJETO / "categorias_fonte.json").read_text(encoding="utf-8"))["categorias"]
 INDICADORES = json.loads((PROJETO / "indicadores_fonte.json").read_text(encoding="utf-8"))["indicadores"]
+# Só os que o classificador aprende do texto. Os demais do catálogo são
+# derivados de regra sobre a lista de vítimas (vitimização policial, chacina) ou
+# avaliados pelo modelo de linguagem (violência de gênero), e por isso não
+# entram na contagem de classes do treino.
+INDICADORES_BERT = [i for i in INDICADORES if i.get("decidido_por") == "bert"]
 
 CINZA = RGBColor(0x44, 0x44, 0x44)
 
@@ -238,18 +254,22 @@ h(1, "Resumo")
 p("Este documento descreve o método, a implementação e o protocolo de avaliação "
   "de um sistema que classifica notícias de violência armada em indicadores, "
   "substituindo a triagem manual que hoje limita o volume de notícias analisadas "
-  "e a velocidade de atualização dos indicadores. A classificação é organizada "
-  "em duas etapas encadeadas. A primeira é binária e tem premissa única: "
-  "determinar se a notícia relata disparo de arma de fogo. A segunda, aplicada "
-  "somente ao que passa pela primeira, atribui a motivação principal entre "
-  f"{len(CATEGORIAS)} categorias e os indicadores de contexto. Para cada etapa "
-  f"são comparados {len(mod_treino.MODELOS)} modelos pré-treinados — monolíngues "
-  "de português e multilíngues — sob uma grade de "
-  f"{len(mod_treino.GRADE)} configurações de hiperparâmetros, com relato de "
+  "e a velocidade de atualização dos indicadores. A classificação é uma tarefa "
+  f"única e multirrótulo: dado o texto, quais dos {len(INDICADORES_BERT)} "
+  "indicadores a notícia sustenta — podem ser vários ao mesmo tempo, ou nenhum. "
+  "Não há etapa binária de triagem antes dela: a notícia fora do escopo é "
+  "justamente a que não recebe indicador algum, e esses exemplos negativos são "
+  "parte do corpus, não descarte. "
+  f"São comparados {len(mod_treino.MODELOS)} modelos pré-treinados monolíngues "
+  "de português sob uma grade de "
+  f"{len(mod_treino.GRADE)} configurações de hiperparâmetros, em "
+  f"{len(mod_treino.ESTRATEGIAS)} estratégias de ajuste, com relato de "
   "acurácia, precisão, recall e medida F1, em versões macro, ponderada e por "
-  "classe, acompanhadas da matriz de confusão. Uma camada de modelo de linguagem "
-  "de grande porte opera após os classificadores, encarregada da confirmação "
-  "contextual e da consolidação de vítimas. O documento detalha a construção do "
+  "classe, acompanhadas da matriz de confusão. Um modelo de linguagem de grande "
+  "porte opera APÓS a marcação e condicionado a ela: ele recebe somente as "
+  "instruções das classes marcadas, e a sua tarefa é aprofundá-las — montar a "
+  "lista de vítimas, preencher a ficha de cada uma e as tabelas complementares. "
+  "O documento detalha a construção do "
   "corpus anotado manualmente, o protocolo de divisão amostral, os critérios de "
   "seleção de hiperparâmetros e as ameaças à validade dos resultados.")
 p()
@@ -285,22 +305,30 @@ p("O problema tratado é o da triagem e classificação automáticas de notícia
   "para alimentar indicadores de violência armada, preservando a qualidade da "
   "classificação manual. A dificuldade está em três pontos. Primeiro, a decisão "
   "de escopo é sutil: muitas notícias mencionam armas de fogo sem relatar "
-  "disparo. Segundo, as categorias de motivação não são mutuamente evidentes a "
-  "partir de palavras isoladas, pois dependem da relação entre quem atirou, "
-  "contra quem e por quê. Terceiro, a contagem de vítimas exige consolidar "
+  "disparo, e o recorte do banco é estrito — registra-se disparo de arma de "
+  "fogo, e vítima é apenas quem foi atingido por disparo, não quem se feriu em "
+  "queda, correria, estilhaço ou mal-estar durante o fato. Segundo, os "
+  "indicadores não são mutuamente evidentes a partir de palavras isoladas, pois "
+  "dependem da relação entre quem atirou, contra quem e em que circunstância: a "
+  "mesma expressão aparece em notícias que recebem indicadores diferentes. "
+  "Terceiro, a contagem de vítimas exige consolidar "
   "fontes diferentes sobre o mesmo fato sem somá-las indevidamente.")
 
 h(2, "1.3 Objetivos")
 p("O objetivo geral é projetar, implementar e avaliar um sistema de "
-  "classificação automática de notícias de violência armada em dois estágios, "
-  "com camada posterior de validação por modelo de linguagem.")
+  "classificação automática de notícias de violência armada em indicadores, no "
+  "qual um classificador ajustado decide QUAIS indicadores a notícia sustenta e "
+  "um modelo de linguagem de grande porte aprofunda apenas os indicadores "
+  "marcados, extraindo deles a lista de vítimas e os campos estruturados.")
 p("Os objetivos específicos são:", recuo=False)
 bullet("construir um corpus de notícias anotado manualmente, com registro da "
        "fonte de cada exemplo, e disponibilizar ferramenta própria de anotação;")
-bullet("comparar modelos pré-treinados de português e multilíngues na tarefa "
-       "binária de identificação de disparo de arma de fogo;")
-bullet("comparar os mesmos modelos na tarefa de atribuição de motivação e na "
-       "atribuição multirrótulo de indicadores de contexto;")
+bullet("comparar modelos pré-treinados monolíngues de português na atribuição "
+       f"multirrótulo dos {len(INDICADORES_BERT)} indicadores;")
+bullet(f"comparar as {len(mod_treino.ESTRATEGIAS)} estratégias de ajuste — uma "
+       "rede com uma saída por indicador, uma rede binária por indicador, e um "
+       "comitê de três modelos por indicador com decisão por votação — na mesma "
+       "partição de teste;")
 bullet("conduzir busca de hiperparâmetros e relatar o seu efeito sobre o "
        "desempenho;")
 bullet("relatar acurácia, precisão, recall, medida F1 e matriz de confusão para "
@@ -309,14 +337,27 @@ bullet("avaliar o ganho da camada de modelo de linguagem sobre a saída dos "
        "classificadores.")
 
 h(2, "1.4 Justificativa")
-p("A arquitetura em dois estágios com validação posterior não é um detalhe de "
-  "implementação, e sim a resposta a uma restrição de custo. Submeter toda "
-  "notícia coletada a um modelo de linguagem de grande porte é caro e lento. Um "
-  "classificador pequeno, treinado especificamente para a decisão de escopo, "
-  "descarta antecipadamente o que está fora dele, e a chamada custosa é "
-  "reservada ao que sobrou. O desenho também torna o sistema auditável: "
-  "separando a decisão de escopo da decisão de categoria, é possível medir cada "
-  "uma isoladamente e identificar em qual estágio um erro se originou.")
+p("A divisão de trabalho entre o classificador e o modelo de linguagem não é um "
+  "detalhe de implementação, e sim a resposta a uma restrição de custo medida em "
+  "produção. Submeter toda notícia coletada a um modelo de linguagem de grande "
+  "porte é caro e lento, e o limite não é teórico: o plano contratado concede "
+  "8.000 tokens por minuto, enquanto uma chamada que carrega as instruções de "
+  "todos os indicadores consome cerca de 6.800 — uma classificação por minuto. "
+  "Com a marcação prévia, apenas as instruções das classes marcadas viajam, e a "
+  "mesma chamada cai para cerca de 4.200 tokens.")
+p("A folga assim obtida não é só economia. Ela é o que permite elevar o esforço "
+  "de raciocínio do modelo de linguagem, e esse parâmetro mostrou-se decisivo "
+  "para a estabilidade da extração: com esforço baixo, a mesma notícia submetida "
+  "oito vezes produziu contagens de vítimas divergentes em quatro delas, "
+  "inclusive uma lista vazia para um texto que descreve duas pessoas atingidas; "
+  "com esforço médio, as cinco execuções foram concordantes. O classificador, "
+  "portanto, não apenas reduz o custo: ele compra a margem de que a etapa "
+  "seguinte precisa para ser confiável.")
+p("O desenho também torna o sistema auditável. A marcação é registrada com a "
+  "confiança de cada classe antes de o modelo de linguagem ver o texto, de modo "
+  "que um erro do classificador corrigido adiante não desaparece do registro. É "
+  "esse registro que permite dizer se um erro veio da marcação ou da extração, e "
+  "é dele que sai o exemplo para o treino seguinte.")
 
 quebra()
 
@@ -346,8 +387,15 @@ p("Modelos multilíngues cobrem dezenas de idiomas com um único vocabulário de
   "monolíngues de português, treinados sobre corpora da língua, tendem a "
   "segmentar melhor o vocabulário e a capturar construções próprias do "
   "português brasileiro, incluindo o registro jornalístico e os termos do campo "
-  "da segurança pública. A comparação entre as duas famílias é um dos eixos "
-  "deste trabalho, e não uma premissa adotada de antemão.")
+  "da segurança pública.")
+p("Este trabalho adota o pré-treinamento monolíngue como PREMISSA, e não como "
+  "hipótese a testar: a comparação restringe-se a modelos de português, e "
+  "nenhum modelo multilíngue é submetido. A decisão é de recorte, e tem "
+  "consequência sobre o que se pode afirmar ao final — os resultados permitem "
+  "dizer qual modelo de português se comporta melhor nesta tarefa, e não se o "
+  "pré-treinamento em português é superior ao multilíngue. Verificar essa "
+  "superioridade exigiria incluir ao menos um modelo multilíngue, e fica "
+  "registrada entre os trabalhos futuros.")
 
 h(2, "2.4 Ajuste fino")
 p("O ajuste fino acrescenta ao modelo pré-treinado uma camada de classificação "
@@ -393,7 +441,7 @@ p("A matriz de confusão dispõe os rótulos verdadeiros nas linhas e as prediç
   "nas colunas. A diagonal principal contém os acertos; cada célula fora dela "
   "indica com qual classe o modelo confundiu a classe da linha. Seu valor "
   "diagnóstico está justamente fora da diagonal: ela mostra se os erros se "
-  "concentram em pares de categorias semanticamente próximas, o que sugere "
+  "concentram em pares de classes semanticamente próximas, o que sugere "
   "revisão dos critérios de anotação, ou se estão dispersos, o que sugere "
   "insuficiência de exemplos.")
 p("Para tarefas multirrótulo, em que uma notícia pode receber mais de um "
@@ -407,42 +455,60 @@ quebra()
 h(1, "3 Arquitetura da solução")
 
 h(2, "3.1 Visão geral")
-p("O sistema recebe a notícia, reduz o texto, aplica o classificador de escopo "
-  "e, se a notícia estiver no escopo, aplica os classificadores de categoria. "
-  "A saída dos classificadores é então submetida ao modelo de linguagem, "
-  "responsável pela confirmação contextual e pela consolidação da lista de "
-  "vítimas. O resultado é gravado com situação “não aprovado” e segue para "
-  "revisão humana.")
+p("A notícia entra por uma fila de recebidas, com o endereço eletrônico, a data "
+  "informada e o texto integral. O classificador a lê e atribui, a cada "
+  "indicador, uma decisão que não é binária: na estratégia de comitê, conta-se "
+  "quantos dos três modelos marcaram aquele indicador, e a notícia é encaminhada "
+  "conforme a concordância — nenhum voto exige revisão humana, voto isolado gera "
+  "alerta a ser verificado, e dois ou três seguem adiante. Somente o que segue "
+  "chega ao modelo de linguagem, e ele recebe apenas as instruções dos "
+  "indicadores marcados. Sua tarefa é aprofundá-los: montar a lista de pessoas "
+  "atingidas, preencher a ficha de cada uma e as tabelas complementares. O "
+  "resultado é gravado com situação “não aprovado” e segue para revisão humana; "
+  "ao ser aprovado, cada notícia da ocorrência retorna ao corpus como exemplo "
+  "rotulado, fechando o ciclo de treino.")
 p()
 tabela(
     ["Etapa", "Natureza", "Descrição"],
     [
-        ["1. Abertura", "humana", "Analista informa data e endereço da ocorrência."],
-        ["2. Inclusão", "humana", "Analista cola link e texto de uma ou mais notícias."],
-        ["3. Pré-processamento", "automática", "Descarte de trechos sem relação com a ocorrência."],
-        ["4. Escopo", "automática", "Classificador binário: há disparo de arma de fogo?"],
-        ["5. Categoria", "automática", "Motivação principal e indicadores de contexto."],
-        ["6. Validação", "automática", "Modelo de linguagem confirma e consolida vítimas."],
+        ["1. Recebimento", "humana", "Analista informa endereço eletrônico, data e texto."],
+        ["2. Marcação", "automática", "Classificador multirrótulo atribui indicadores."],
+        ["3. Triagem", "automática", "Encaminhamento por faixa de concordância."],
+        ["4. Revisão da faixa", "humana", "Confirmação do que ficou sem voto ou com voto isolado."],
+        ["5. Abertura", "humana", "Analista informa data e endereço da ocorrência."],
+        ["6. Aprofundamento", "automática", "Modelo de linguagem extrai vítimas e campos estruturados."],
         ["7. Verificação", "humana", "Analista confere e corrige a lista de vítimas."],
         ["8. Regras", "automática", "Indicadores dependentes das vítimas são calculados."],
         ["9. Registro", "automática", "Gravação com situação “não aprovado”."],
-        ["10. Aprovação", "humana", "Responsável libera ou devolve o registro."],
+        ["10. Aprovação", "humana", "Responsável libera o registro; as notícias vão ao corpus."],
     ],
     [3.4, 2.4, 10.2],
 )
 legenda("Tabela 2 — Etapas do fluxo, com indicação do agente responsável.")
 
-h(2, "3.2 Por que duas etapas de classificação")
-p("A separação entre escopo e categoria tem três justificativas. A primeira é "
-  "de custo: a etapa de escopo é a que recebe o maior volume e, por ser "
-  "binária, pode ser resolvida por um modelo pequeno com alta confiança. A "
-  "segunda é de interpretabilidade: uma matriz de confusão binária distingue "
-  "claramente os dois tipos de erro — admitir notícia fora do escopo e rejeitar "
-  "notícia dentro dele — que têm consequências diferentes para o indicador "
-  "final. A terceira é de qualidade do treino da segunda etapa: ao restringir a "
-  "classificação de motivação às notícias que efetivamente relatam disparo, "
-  "evita-se ensinar o modelo a atribuir motivação a textos para os quais a "
-  "pergunta não se aplica.")
+h(2, "3.2 Por que o classificador decide e o modelo de linguagem aprofunda")
+p("A divisão de papéis obedece a uma regra única: o classificador decide QUAIS "
+  "indicadores existem na notícia; o modelo de linguagem só aprofunda dentro dos "
+  "indicadores já marcados, e não pode acrescentar nenhum. O que ele devolver "
+  "fora da marcação é descartado pelo sistema — não apenas desencorajado no "
+  "texto da instrução, mas filtrado em código, porque instrução de prompt não é "
+  "garantia.")
+p("A regra tem três justificativas. A primeira é de custo, e está quantificada "
+  "na seção 1.4. A segunda é de consistência: dois classificadores gerais sobre "
+  "o mesmo texto produzem duas respostas que podem divergir, e não haveria "
+  "critério para decidir qual delas prevalece. A terceira é de mensurabilidade: "
+  "a marcação é reprodutível e pode ser avaliada contra um conjunto de teste "
+  "fixo, enquanto a extração do modelo de linguagem não é determinística — a "
+  "mesma entrada produz saídas diferentes entre execuções. Concentrar a decisão "
+  "de classe no componente mensurável é o que permite afirmar algo sobre o "
+  "desempenho do sistema.")
+p("A marcação também AUTORIZA. Determinadas circunstâncias da vítima só são "
+  "avaliadas quando a classe que as destrava foi marcada: feminicídio só é "
+  "avaliado quando o indicador de mulheres baleadas está presente, e a "
+  "circunstância de pessoa LGBTQIAPN+ apenas quando o indicador correspondente "
+  "está. A instrução de cada uma só viaja no prompt quando pode ser usada, e a "
+  "resposta é filtrada pela mesma condição, de modo que a autorização vale ainda "
+  "que a instrução seja ignorada.")
 
 h(2, "3.3 O papel do modelo de linguagem")
 p("A camada de modelo de linguagem não substitui os classificadores; ela atua "
@@ -462,7 +528,7 @@ quebra()
 # ------------------------------------------------------------------ corpus
 h(1, "4 Passo 1: construção do corpus")
 
-h(2, "4.1 A premissa da primeira tarefa")
+h(2, "4.1 A premissa da anotação")
 p("A primeira tarefa tem uma premissa única e deliberadamente estreita: "
   "considera-se violência armada a notícia que relata disparo de arma de fogo. "
   "Essa definição é operacional, não conceitual — ela não afirma o que é "
@@ -486,15 +552,16 @@ p("Um corpus formado apenas por notícias de violência armada não é utilizáv
   "ferramenta de anotação, por isso, exibe a contagem das duas classes e impede "
   "o início do treino enquanto uma delas não tiver exemplos suficientes.")
 
-h(2, "4.3 Anotação da segunda etapa")
-p("A motivação principal é atribuída somente a notícias positivas na primeira "
-  f"etapa, entre as {len(CATEGORIAS)} categorias do Apêndice A. A anotação segue "
-  "dois princípios herdados do manual de curadoria: classifica-se o fato que "
-  "originou os tiros, não o seu desfecho, e consideram-se apenas as "
-  "circunstâncias diretamente ligadas ao momento do disparo, desprezando "
-  "antecedentes e consequências que não constituam novo disparo.")
-p("Os indicadores de contexto formam tarefa multirrótulo independente: uma "
-  "mesma notícia pode receber mais de um, ou nenhum.")
+h(2, "4.3 Princípios da anotação")
+p("A anotação segue dois princípios herdados do manual de curadoria: "
+  "consideram-se apenas as circunstâncias diretamente ligadas ao MOMENTO do "
+  "disparo, desprezando antecedentes do envolvido e consequências posteriores "
+  "que não constituam novo disparo; e o recorte é estrito quanto à natureza do "
+  "ferimento, pois registra-se disparo de arma de fogo, não ferimento por queda, "
+  "estilhaço, arma branca ou mal-estar ocorridos durante o mesmo fato.")
+p("A tarefa é multirrótulo: uma mesma notícia pode receber mais de um indicador, "
+  "ou nenhum. O rótulo vazio é um rótulo válido e necessário, e a sua ausência "
+  "no corpus é o que faz um classificador marcar algo em todo texto.")
 
 h(2, "4.4 Rastreabilidade")
 p("Cada exemplo do corpus guarda o endereço eletrônico e o texto integral da "
@@ -508,13 +575,20 @@ p("Cada exemplo do corpus guarda o endereço eletrônico e o texto integral da "
 
 h(2, "4.5 Ferramenta de anotação")
 p("A anotação é feita em interface própria, integrada à aplicação, que cumpre o "
-  "papel de ambientes especializados do gênero. A notícia é inserida com link, "
-  "título e texto; a primeira decisão é binária e apresentada de forma "
-  "destacada, com a premissa do disparo reafirmada na própria tela; as "
-  "definições das categorias de motivação ficam disponíveis durante a anotação, "
-  "o que reduz a dependência de memória do anotador. Notícias inseridas sem "
-  "rótulo entram em uma fila, e há navegação direta para o próximo item "
-  "pendente.")
+  "papel de ambientes especializados do gênero. A notícia é inserida com "
+  "endereço eletrônico, data e texto, e o anotador marca os indicadores que o "
+  "texto sustenta — nenhum, um ou vários. A definição de cada indicador fica "
+  "visível ao lado da respectiva caixa durante a anotação, o que reduz a "
+  "dependência de memória, e a tela afirma explicitamente que não marcar nada é "
+  "uma decisão válida, não uma pendência.")
+p("A fila é ordenada por gravidade, não por data. Quando há modelo treinado, a "
+  "notícia em que o classificador não marcou indicador algum aparece primeiro, "
+  "sinalizada em vermelho: é o falso negativo, o erro mais custoso de não "
+  "examinar, porque o indicador que o classificador não marca não chega a ser "
+  "avaliado pela etapa seguinte. Em seguida vem o que recebeu voto isolado no "
+  "comitê, sinalizado em laranja. A rotulagem feita nessa fila alimenta "
+  "diretamente o corpus, de modo que o trabalho de conferência e o de construção "
+  "do conjunto de treino são o mesmo trabalho.")
 p("A interface informa, por tarefa, se o corpus já sustenta uma medição "
   f"honesta. O limiar adotado é de {mod_corpus.MINIMO_POR_CLASSE} exemplos por "
   "classe para considerar a métrica estável, e de três exemplos como mínimo "
@@ -524,14 +598,19 @@ p("A interface informa, por tarefa, se o corpus já sustenta uma medição "
   "percentuais, e relatar tal número como resultado seria enganoso.")
 
 h(2, "4.6 Dimensionamento esperado")
-p("Para a tarefa binária, um corpus equilibrado com algumas centenas de "
-  "exemplos em cada classe é suficiente para estimativas estáveis. Para a "
-  f"tarefa de motivação, com {len(CATEGORIAS)} categorias, o requisito é "
-  "substancialmente maior: mantendo a ordem de grandeza de algumas dezenas de "
-  "exemplos por categoria no conjunto de treino, chega-se à casa do milhar de "
-  "notícias anotadas. Categorias raras na realidade — e portanto raras no "
-  "corpus — devem ser reportadas com o seu suporte explícito, e a discussão dos "
-  "resultados precisa distinguir limitação do modelo de insuficiência amostral.")
+p(f"São {len(INDICADORES_BERT)} indicadores, e a exigência amostral se conta por "
+  "indicador, não por notícia: mantendo a ordem de grandeza de algumas dezenas "
+  "de exemplos positivos de cada um no conjunto de treino, e somando os exemplos "
+  "sem indicador algum, chega-se à casa das centenas de notícias anotadas. Como "
+  "a tarefa é multirrótulo, uma mesma notícia contribui para mais de um "
+  "indicador, o que atenua o total, porém não socorre o indicador raro — que "
+  "continua dependendo de encontrar notícias em que ele apareça.")
+p("Indicadores raros na realidade — e portanto raros no corpus — devem ser "
+  "reportados com o seu suporte explícito, e a discussão dos resultados precisa "
+  "distinguir limitação do modelo de insuficiência amostral. O sistema não "
+  "permite treinar com menos de três exemplos da classe mais rara, por não haver "
+  "como representá-la nas três partições, e sinaliza como instável toda classe "
+  f"com menos de {mod_corpus.MINIMO_POR_CLASSE} exemplos.")
 
 quebra()
 
@@ -541,16 +620,26 @@ p("Textos jornalísticos coletados da web carregam material alheio ao fato: "
   "chamadas para outras matérias, créditos de fotografia, elementos de "
   "navegação e publicidade. Esse material consome espaço da janela de entrada do "
   "modelo sem contribuir para a decisão.")
-p("O pré-processamento adotado opera no nível da sentença. Um modelo de "
+p("O pré-processamento implementado opera no nível da sentença. Um modelo de "
   "processamento de linguagem natural segmenta o texto e preserva as sentenças "
-  "que contenham pelo menos um termo do vocabulário relevante — extraído "
-  "automaticamente das próprias definições das categorias — ou uma entidade "
-  "nomeada de pessoa, local ou organização. Se o filtro for agressivo demais e "
-  "restar menos de um mínimo de sentenças, o texto original é mantido, de modo "
-  "que o procedimento nunca piore a entrada.")
+  "que contenham pelo menos um termo do vocabulário relevante — extraído das "
+  "definições dos indicadores e das listas fechadas do dicionário de dados — ou "
+  "uma entidade nomeada de pessoa, local ou organização. Se o filtro for "
+  "agressivo demais e restar menos de um mínimo de sentenças, o texto original é "
+  "mantido, de modo que o procedimento nunca piore a entrada.")
+p("ESSE FILTRO ESTÁ DESLIGADO POR PADRÃO, e a decisão é resultado de medição. "
+  "Aplicado às notícias já coletadas, ele descartou cerca de um décimo do texto, "
+  "e entre o descartado havia fato material: de uma reportagem sobre tiroteio "
+  "saíram a sentença que posicionava a vítima em relação à viatura policial e a "
+  "que informava o estado de saúde das pessoas atingidas. Nenhuma das duas "
+  "continha termo do vocabulário nem entidade nomeada, e esse é todo o critério "
+  "do filtro. A economia obtida, da ordem de algumas dezenas de tokens por "
+  "notícia, não compensa o risco de suprimir a informação que sustenta a "
+  "classificação; o recurso permanece disponível para o caso de o orçamento de "
+  "tokens se tornar restritivo.")
 p("Uma segunda forma de compressão, no nível da palavra, com remoção de "
-  "palavras funcionais e lematização, foi implementada e deliberadamente "
-  "deixada fora do fluxo padrão. Ela remove preposições como “por” e “contra”, "
+  "palavras funcionais e lematização, foi implementada, testada e "
+  "posteriormente removida do código. Ela remove preposições como “por” e “contra”, "
   "que são exatamente os elementos que marcam quem atirou contra quem. A "
   "supressão dessas marcas inverteu a direção atribuída ao disparo em testes "
   "conduzidos durante o desenvolvimento, produzindo classificação incorreta. O "
@@ -573,20 +662,52 @@ p("O corpus é dividido em três partições: treino, usada para atualizar os "
   f"{int(mod_corpus.PROPORCAO_PADRAO[2]*100)}%, respectivamente.")
 
 h(2, "6.2 Estratificação")
-p("A divisão é estratificada para que a proporção entre classes se mantenha nas "
-  "três partições. A implementação adotada estratifica de forma exata pelo "
-  "rótulo binário e distribui as motivações dentro de cada grupo por "
-  "intercalação: as listas de cada motivação são embaralhadas e percorridas em "
-  "paralelo, formando uma sequência em que o primeiro exemplo de cada categoria "
-  "aparece antes do segundo de qualquer outra.")
-p("A escolha merece registro porque uma solução aparentemente mais correta "
-  "falha. Estratificar separadamente por cada par de rótulo binário e motivação "
-  "produz, com quinze categorias, um grande número de estratos com um ou dois "
-  "exemplos. Como um estrato pequeno não pode ser repartido em três, ele é "
-  "atribuído integralmente ao treino, e o efeito agregado é esvaziar validação e "
-  "teste da classe positiva. A intercalação preserva a proporção binária exata, "
-  "espalha as motivações entre as partições e garante que nenhuma categoria "
-  "fique sem exemplo de treino, por ordenar a sequência começando pelo treino.")
+p("A divisão é estratificada para que a proporção de cada indicador se mantenha "
+  "nas três partições. Em tarefa multirrótulo isso não é imediato: a mesma "
+  "notícia pode portar três indicadores e pertenceria a três estratos "
+  "simultaneamente, de modo que o procedimento usual de fatiar cada classe "
+  "separadamente não se aplica.")
+p("Duas soluções intuitivas foram descartadas, e o registro da razão importa "
+  "porque a segunda é silenciosamente defeituosa. A primeira é tratar a "
+  f"combinação de indicadores como estrato; com {len(mod_ind.do_bert())} "
+  "indicadores existem, em princípio, dezenas de combinações observáveis, quase "
+  "todas com um ou dois exemplos, e um estrato de um exemplo recai "
+  "integralmente sobre uma partição. A segunda é embaralhar essas combinações e "
+  "percorrê-las em paralelo, formando uma sequência em que o primeiro exemplo "
+  "de cada combinação precede o segundo de qualquer outra, para então cortar a "
+  "sequência nas proporções desejadas. O procedimento parece distribuir os "
+  "estratos pequenos, mas produz o efeito oposto: como o início da sequência "
+  "recebe um exemplo de cada combinação, o corte inicial — o treino — absorve "
+  "todos os estratos pequenos por inteiro, e a cauda da sequência, de onde saem "
+  "validação e teste, contém apenas os estratos grandes. O resultado observado "
+  "em verificação empírica foi o esvaziamento completo dos indicadores raros nas "
+  "duas partições de avaliação.")
+p("Adota-se, em lugar disso, a estratificação iterativa para dados "
+  "multirrótulo, no formato proposto por Sechidis, Tsoumakas e Vlahavas (2011). "
+  "Cada partição recebe uma cota global e uma cota por indicador, ambas "
+  "proporcionais ao tamanho pretendido. As notícias são distribuídas uma a uma, "
+  "e a ordem de atendimento é determinada pelo indicador com menor número de "
+  "exemplos ainda não distribuídos: cada notícia que o contém é encaminhada à "
+  "partição com maior cota remanescente naquele indicador, descontando-se em "
+  "seguida a cota de todos os indicadores que a notícia porta. Atender primeiro "
+  "o indicador mais raro é o que faz os seus poucos exemplos serem repartidos "
+  "entre as três partições em vez de se concentrarem na primeira. A partição que "
+  "já completou a sua cota global é excluída da disputa, o que mantém os "
+  "tamanhos das partições aderentes às proporções pretendidas.")
+p("A notícia sem nenhum indicador — o exemplo negativo — é tratada como "
+  "portadora de um indicador próprio, exclusivo dela. Sem esse artifício, as "
+  "negativas seriam distribuídas apenas no fim do procedimento, pela cota que "
+  "restasse, e poderiam concentrar-se em uma única partição; como são elas que "
+  "ensinam o modelo a não atribuir indicador algum, a sua proporção precisa ser "
+  "preservada igualmente.")
+p("A consequência prática justifica o cuidado. Sem exemplo de um indicador na "
+  "validação, não há como calibrar o limiar de decisão daquele indicador, e ele "
+  "permanece no corte neutro, exatamente a condição em que o indicador raro "
+  "deixa de ser atribuído. Sem exemplo no conjunto de teste, a medida F1 do "
+  "indicador é reportada como zero com suporte zero, o que se confunde com erro "
+  "do modelo. A interface de anotação exibe a contagem por indicador em cada "
+  "partição justamente para que essas duas situações sejam visíveis antes do "
+  "treino.")
 
 h(2, "6.3 Fixação da divisão")
 p("A partição de cada exemplo é gravada em banco de dados, e não sorteada a "
@@ -599,10 +720,13 @@ p("A partição de cada exemplo é gravada em banco de dados, e não sorteada a 
 quebra()
 
 # ------------------------------------------------------------------ modelos
-h(1, "7 Passo 4: modelos comparados")
-p("A comparação abrange seis modelos pré-treinados, escolhidos para cobrir três "
-  "eixos de variação: a oposição entre modelos monolíngues de português e "
-  "multilíngues, o efeito do tamanho do modelo e o efeito da destilação.")
+h(1, "7 Passo 4: modelos comparados e estratégias de ajuste")
+
+h(2, "7.1 Modelos pré-treinados")
+p(f"A comparação abrange {len(mod_treino.MODELOS)} modelos pré-treinados, todos "
+  "monolíngues de português, conforme a premissa registrada na seção 2.3. A "
+  "variação coberta é, portanto, o efeito do tamanho do modelo e a diferença "
+  "entre as duas famílias disponíveis para o idioma.")
 p()
 tabela(
     ["Identificação", "Modelo", "Parâmetros", "Família"],
@@ -612,18 +736,147 @@ tabela(
 )
 legenda("Tabela 3 — Modelos submetidos à comparação.")
 
-p("A inclusão de duas variantes de tamanho da mesma família permite separar o "
-  "ganho atribuível à escala do ganho atribuível ao idioma do pré-treinamento. "
-  "A variante destilada fornece o ponto de comparação de custo: se o seu "
-  "desempenho for próximo ao das variantes completas, a escolha de "
-  "implementação passa a ser decidida por tempo de inferência, e não por "
-  "qualidade.")
+p("A inclusão de duas variantes de tamanho da mesma família — BERTimbau base e "
+  "large — permite isolar o efeito da escala, uma vez que o corpus e o "
+  "procedimento de pré-treinamento são os mesmos. A Albertina PT-BR, de porte "
+  "comparável à variante base mas pré-treinada sobre corpora distintos e "
+  "especificamente de português do Brasil, fornece o contraste entre famílias. "
+  "Se a variante base alcançar desempenho próximo ao da variante large, a "
+  "escolha de implementação passa a ser decidida por custo de inferência e "
+  "memória, e não por qualidade — observação relevante porque a variante large "
+  "é também a que corre maior risco de não caber na memória disponível.")
 p("Modelos cujo treino não se complete — por exemplo, por insuficiência de "
   "memória da unidade de processamento gráfico nas configurações de maior "
   "comprimento de sequência — têm a falha registrada com a respectiva mensagem. "
   "A informação integra o resultado: um modelo que não cabe no equipamento "
   "disponível é um achado de viabilidade, e omiti-lo da tabela daria a entender "
   "que não foi avaliado.")
+
+h(2, "7.2 Natureza multirrótulo da tarefa")
+p("A tarefa não consiste em atribuir a uma notícia o indicador que melhor a "
+  "descreve, e sim em decidir, para cada indicador do catálogo, se a notícia o "
+  "sustenta. Uma ocorrência em que uma adolescente é atingida durante operação "
+  "policial porta simultaneamente os indicadores de criança ou adolescente "
+  "baleado, de mulher baleada e de ação policial, e a atribuição de um deles não "
+  "pode suprimir as demais.")
+p("A consequência arquitetural é a escolha da função de ativação da camada de "
+  "saída. Adota-se uma função logística independente por indicador, e não a "
+  "função softmax. Sob softmax as pontuações somam um e as classes competem "
+  "entre si, de modo que atribuir dois indicadores exigiria que um cedesse "
+  "pontuação ao outro; sob a função logística independente, cada indicador é "
+  "comparado ao seu próprio limiar e decide isoladamente. A ausência de "
+  "indicador algum é, por construção, uma resposta válida, e corresponde à "
+  "notícia fora do escopo de monitoramento. A função de perda correspondente é "
+  "a entropia cruzada binária aplicada a cada saída.")
+
+h(2, "7.3 Estratégias de ajuste comparadas")
+p("Duas estratégias produzem essa mesma forma de saída, e ambas são "
+  "implementadas e submetidas à mesma partição de teste, de modo que a escolha "
+  "entre elas seja resultado medido e não suposição.")
+p()
+tabela(
+    ["Estratégia", "Descrição", "Redes ajustadas"],
+    [["modelo único",
+      "Uma rede com uma saída logística independente por indicador; o "
+      "codificador é compartilhado por todos eles.",
+      "1"],
+     ["um por indicador",
+      "Uma rede binária independente por indicador, no esquema "
+      "um-contra-resto; as saídas são reunidas em um vetor multirrótulo.",
+      str(len(mod_ind.do_bert()))],
+     ["comitê por indicador",
+      f"{len(mod_treino.MODELOS_CLUSTER)} redes binárias por indicador, uma de "
+      "cada arquitetura, com decisão por votação: o indicador só é atribuído "
+      "automaticamente quando a concordância atinge o corte.",
+      str(len(mod_treino.MODELOS_CLUSTER) * len(mod_ind.do_bert()))]],
+    [3.4, 8.6, 2.0,
+     ],
+)
+legenda("Tabela 4 — Estratégias de ajuste submetidas à comparação.")
+
+p("A estratégia de modelo único tem a seu favor o compartilhamento de "
+  "representação: o que a rede aprende sobre a linguagem do noticiário policial "
+  "beneficia todos os indicadores ao mesmo tempo, o que é relevante quando o "
+  "corpus é pequeno. A estratégia de um modelo por indicador tem a seu favor a "
+  "independência: cada indicador recebe a capacidade integral de uma rede e o "
+  "seu próprio ponto de parada, e um indicador raro não disputa parâmetros com "
+  "os frequentes. O custo é proporcional ao número de indicadores, em tempo de "
+  "treino, em espaço de armazenamento dos pesos e em memória durante a "
+  "inferência, uma vez que todas as redes precisam estar carregadas para "
+  "classificar uma única notícia.")
+p("A terceira estratégia submete a mesma notícia a três arquiteturas distintas "
+  "por indicador e decide por votação, com um limiar calibrado para CADA rede "
+  "separadamente. Essa separação é deliberada: um limiar comum às três faria com "
+  f"que discordassem menos por construção, e a discordância é o sinal "
+  "procurado. A decisão resultante tem três faixas, e não duas — nenhum voto "
+  "encaminha a notícia à revisão humana, voto abaixo do corte gera alerta a ser "
+  "verificado, e a partir do corte o indicador segue automaticamente. O preço é "
+  "explícito nas métricas, que reportam a fração de decisões não automáticas ao "
+  "lado do desempenho.")
+p("A viabilidade do comitê depende de um detalhe de implementação: as redes são "
+  "treinadas e descartadas uma a uma, e na inferência carrega-se apenas o grupo "
+  "de um indicador por vez. Mantidas todas em memória simultaneamente, as "
+  f"{len(mod_treino.MODELOS_CLUSTER) * len(mod_ind.do_bert())} redes excederiam "
+  "a memória da unidade gráfica utilizada; carregadas em grupo, o pico medido "
+  "ficou em torno de um quarto dela. O custo transferiu-se para o tempo: a "
+  "classificação de uma notícia passa a exigir vários ciclos de carregamento.")
+p("A comparação entre as estratégias multiplica o número de execuções, "
+  f"razão pela qual é conduzida sobre uma única configuração da grade: com "
+  f"{len(mod_treino.MODELOS)} modelos e {len(mod_treino.GRADE)} configurações, a "
+  f"estratégia de modelo único ajusta "
+  f"{len(mod_treino.MODELOS) * len(mod_treino.GRADE)} redes, a de um modelo por "
+  f"indicador ajusta "
+  f"{len(mod_treino.MODELOS) * len(mod_treino.GRADE) * len(mod_ind.do_bert())}, e "
+  "a de comitê ajusta "
+  f"{len(mod_treino.GRADE) * len(mod_treino.MODELOS_CLUSTER) * len(mod_ind.do_bert())} "
+  "— esta última uma vez por configuração, e não por modelo, pois emprega os "
+  "três simultaneamente.")
+
+h(2, "7.4 Desbalanceamento: ponderação da perda")
+p("Os indicadores têm frequências muito distintas no corpus, e o "
+  "desbalanceamento afeta a classificação multirrótulo de maneira específica. "
+  "Para um indicador presente em vinte de quatrocentas notícias, a perda de "
+  "entropia cruzada binária é quase minimizada por um modelo que nunca o "
+  "atribui: o acerto em trezentos e oitenta exemplos negativos compensa o erro "
+  "em vinte positivos. O comportamento resultante — atribuir apenas os "
+  "indicadores frequentes — é frequentemente interpretado como incapacidade do "
+  "modelo de reconhecer mais de um indicador, quando se trata de um efeito da "
+  "função de perda.")
+p("A correção adotada é a ponderação do termo positivo da perda de cada "
+  "indicador pela razão entre o número de exemplos negativos e o de positivos "
+  "daquele indicador no conjunto de treino. A razão é limitada a um teto de "
+  f"{mod_treino.TETO_PESO_POSITIVO:.0f}, pois um indicador com dois exemplos "
+  "entre quatrocentos receberia peso próximo a duzentos e passaria a responder "
+  "por quase toda a atualização dos parâmetros, invertendo o problema. Os pesos "
+  "efetivamente aplicados são registrados junto às métricas da execução.")
+
+h(2, "7.5 Calibração do limiar de decisão")
+p("A segunda correção incide sobre o limiar de decisão. O valor convencional de "
+  "cinco décimos é adequado quando as classes são equilibradas, mas não quando "
+  "não são: a saída logística de um indicador raro tende a permanecer abaixo "
+  "desse valor mesmo nos casos em que o indicador se aplica, de modo que o "
+  "indicador deixa de ser atribuído ainda que as suas pontuações estejam "
+  "corretamente ordenadas. Um limiar comum a todos os indicadores impõe, assim, "
+  "um custo concentrado nos indicadores menos frequentes.")
+p("Adota-se um limiar por indicador, obtido por varredura sobre o conjunto de "
+  "validação, em incrementos de cinco centésimos, selecionando-se o valor que "
+  "maximiza a medida F1 daquele indicador. Em caso de empate, prefere-se o "
+  "limiar mais baixo, decisão justificada pela assimetria entre os dois tipos "
+  "de erro nesta arquitetura: o indicador atribuído indevidamente é submetido ao "
+  "modelo de linguagem da etapa seguinte, que pode descartá-lo, enquanto o "
+  "indicador não atribuído não chega a ser avaliado, e a perda é definitiva.")
+p("A calibração utiliza exclusivamente o conjunto de validação. Calibrar sobre "
+  "o conjunto de teste produziria uma estimativa otimista, por selecionar o "
+  "limiar com conhecimento dos dados sobre os quais o resultado é reportado. "
+  "Para que o efeito da calibração seja verificável e não apenas afirmado, "
+  "registra-se junto a cada execução a medida F1 que o mesmo modelo obteria, no "
+  "mesmo conjunto de teste, com todos os limiares fixados em cinco décimos; a "
+  "diferença entre os dois valores é o efeito medido do procedimento. O limiar "
+  "de cada indicador é gravado com os pesos do modelo, pois a decisão de "
+  "classificação não é reproduzível sem ele.")
+p("Indicadores sem exemplo positivo no conjunto de validação não admitem "
+  "calibração e permanecem no valor convencional, situação que é registrada "
+  "explicitamente para que o valor não seja lido como resultado de seleção.")
 
 quebra()
 
@@ -642,7 +895,7 @@ tabela(
      for i, h_ in enumerate(mod_treino.GRADE)],
     [1.0, 4.0, 1.6, 1.8, 3.0, 4.6],
 )
-legenda("Tabela 4 — Grade de hiperparâmetros.")
+legenda("Tabela 5 — Grade de hiperparâmetros.")
 
 p("Os valores situam-se na faixa recomendada pela literatura de ajuste fino de "
   "modelos BERT, com taxas de aprendizado entre 2·10⁻⁵ e 5·10⁻⁵ e número "
@@ -688,31 +941,47 @@ p("O suporte por classe é parte obrigatória do relato. Uma classe sem exemplos
   "no conjunto de teste recebe, por convenção, medida F1 igual a zero, o que "
   "não representa erro do modelo e sim ausência de medição. Sem o suporte ao "
   "lado, o valor é lido incorretamente.")
+p("Duas grandezas adicionais são registradas por serem específicas desta "
+  "tarefa. A primeira é a medida F1 que o mesmo modelo obteria, no mesmo "
+  "conjunto de teste, com todos os limiares fixados em cinco décimos; "
+  "confrontada com a medida reportada, ela torna verificável o efeito da "
+  "calibração descrita na seção 7.5. A segunda é o número médio de indicadores "
+  "atribuídos por notícia, apresentado ao lado do número médio presente no "
+  "gabarito, acompanhado da contagem de notícias com dois ou mais indicadores e "
+  "da contagem de notícias sem indicador algum. Essas contagens respondem "
+  "diretamente à pergunta sobre a capacidade do modelo de atribuir indicadores "
+  "simultâneos: uma média atribuída sistematicamente inferior à do gabarito "
+  "indica atribuição insuficiente, e o diagnóstico recai em primeiro lugar sobre "
+  "o limiar, não sobre a representação aprendida.")
 
 h(2, "9.2 Estrutura da matriz de confusão")
-p("A tabela a seguir exemplifica a disposição adotada para a tarefa binária, "
-  "com os quatro resultados possíveis e a sua interpretação no domínio.")
+p("Em tarefa multirrótulo não existe matriz única: reporta-se uma matriz 2×2 "
+  "por indicador, cada uma tratando a presença daquele indicador como problema "
+  "independente. A tabela a seguir exemplifica a disposição adotada, com os "
+  "quatro resultados e a sua interpretação no domínio.")
 p()
 tabela(
-    ["", "Predito: sem disparo", "Predito: com disparo"],
+    ["", "Predito: indicador ausente", "Predito: indicador presente"],
     [
-        ["Real: sem disparo",
-         "Verdadeiro negativo — notícia fora do escopo corretamente descartada.",
-         "Falso positivo — notícia fora do escopo admitida; gera chamada de modelo de linguagem desnecessária e pode contaminar o indicador."],
-        ["Real: com disparo",
-         "Falso negativo — ocorrência real descartada; o caso simplesmente não entra na base e o indicador é subestimado.",
-         "Verdadeiro positivo — ocorrência corretamente encaminhada à segunda etapa."],
+        ["Real: ausente",
+         "Verdadeiro negativo — o indicador corretamente não foi atribuído.",
+         "Falso positivo — indicador atribuído sem base; a instrução dele viaja no prompt sem necessidade, e o modelo de linguagem pode descartá-lo ao não achar sustentação no texto."],
+        ["Real: presente",
+         "Falso negativo — indicador não atribuído; a instrução dele não viaja, o aprofundamento correspondente não acontece e o indicador final é subestimado.",
+         "Verdadeiro positivo — indicador atribuído e encaminhado ao aprofundamento."],
     ],
     [3.4, 6.3, 6.3],
 )
-legenda("Tabela 5 — Interpretação da matriz de confusão da tarefa de escopo.")
+legenda("Tabela 6 — Interpretação da matriz de confusão de um indicador.")
 
 p("A assimetria entre os dois tipos de erro é relevante para a escolha "
-  "operacional do ponto de corte. O falso positivo tem custo de processamento e "
-  "é passível de correção na etapa seguinte, inclusive pela revisão humana. O "
-  "falso negativo é mais grave, porque a ocorrência não chega a existir no "
-  "sistema e o erro não deixa rastro. Essa consideração favorece, para a "
-  "primeira etapa, a priorização do recall da classe positiva.")
+  "operacional do ponto de corte. O falso positivo é descartável: a instrução "
+  "daquela classe viaja no prompt, e tanto o modelo de linguagem quanto a revisão "
+  "humana podem recusá-la. O falso negativo é perda definitiva, porque a classe "
+  "que não foi marcada não chega a ser avaliada por ninguém. Essa consideração "
+  "orienta duas decisões do sistema: a priorização do recall na calibração do "
+  "limiar, que em caso de empate escolhe o corte mais baixo, e o encaminhamento à "
+  "revisão humana de toda notícia em que nenhum indicador foi marcado.")
 
 h(2, "9.3 Avaliação interativa")
 p("Além das métricas agregadas, a aplicação disponibiliza interface de teste "
@@ -784,26 +1053,44 @@ h(2, "11.2 Execução dos experimentos")
 p("A comparação completa é disparada por linha de comando, com as variações "
   "abaixo:")
 codigo([
-    "# sorteia a divisão e compara os seis modelos na tarefa de escopo",
-    "python rodar_treino.py --dividir --tarefa violencia",
+    "# sorteia a divisão e compara os seis modelos",
+    "python rodar_treino.py --dividir",
     "",
-    "# executa as três tarefas em sequência",
-    "python rodar_treino.py --tarefa todas",
+    "# compara as duas estratégias de ajuste na mesma partição de teste",
+    "python rodar_treino.py --estrategia ambas --grade 1",
+    "",
+    "# ajusta uma rede binária por indicador",
+    "python rodar_treino.py --estrategia por_indicador --grade 1",
     "",
     "# força execução em processador",
-    "python rodar_treino.py --tarefa violencia --dispositivo cpu",
+    "python rodar_treino.py --dispositivo cpu",
     "",
     "# restringe a um modelo e a uma configuração da grade",
-    "python rodar_treino.py --tarefa motivacao --modelo bertimbau-base --grade 1",
+    "python rodar_treino.py --modelo bertimbau-base --grade 1",
+    "",
+    "# desliga as correções de desbalanceamento, para medir o efeito delas",
+    "python rodar_treino.py --sem-peso-classes --sem-calibrar-limiar --grade 1",
 ])
 
 h(2, "11.3 Registro dos resultados")
-p("Cada execução grava uma linha em banco de dados contendo tarefa, modelo, "
-  "hiperparâmetros, métricas completas, matriz de confusão, histórico por "
-  "época, tamanho das três partições, duração e dispositivo. Os pesos do melhor "
-  "modelo de cada tarefa são gravados em disco e utilizados pela interface de "
-  "teste. O corpus anotado é exportável em planilha, para anexação ao trabalho "
-  "e verificação independente.")
+p("Cada execução grava uma linha em banco de dados contendo tarefa, estratégia "
+  "de ajuste, modelo, hiperparâmetros, métricas completas, matriz de confusão "
+  "por indicador, limiar calibrado de cada indicador, histórico por época, "
+  "tamanho das três partições, número de redes ajustadas, duração e "
+  "dispositivo. O registro da estratégia e do número de redes é o que permite "
+  "ler a tabela como comparação entre as duas alternativas, e não como lista de "
+  "execuções heterogêneas; o registro dos limiares é condição de "
+  "reprodutibilidade, pois a mesma rede sob outros limiares produz outras "
+  "métricas.")
+p("Os pesos do melhor modelo são gravados em disco acompanhados de um manifesto "
+  "que declara a estratégia adotada, a ordem dos indicadores, o limiar de cada "
+  "um e o comprimento máximo de sequência empregado. A ordem dos indicadores é "
+  "registrada porque define as posições do vetor de saída: um indicador "
+  "acrescentado ao catálogo após o treino não existe nos pesos, e a leitura do "
+  "catálogo corrente deslocaria todas as posições. As estratégias "
+  "coexistem em disco, em diretórios distintos, e o manifesto determina qual "
+  "delas responde em produção. O corpus anotado é exportável em planilha, para "
+  "anexação ao trabalho e verificação independente.")
 
 h(2, "11.4 Determinismo")
 p("A semente do sorteio da divisão é explícita e registrada. A inicialização da "
@@ -828,20 +1115,20 @@ p("Enquanto o corpus estiver em construção, a seção permanece sem números: 
   "discutido na seção 4.5.")
 
 h(2, "12.1 Caracterização do corpus")
-p("Reportar o total de notícias anotadas, a distribuição entre as classes da "
-  "tarefa de escopo, a distribuição por categoria de motivação e por indicador, "
-  "e o tamanho das três partições. Classes com suporte reduzido devem ser "
-  "identificadas nesta subseção, pois condicionam a leitura das métricas.")
+p("Reportar o total de notícias anotadas, a distribuição por indicador, a "
+  "contagem de notícias sem indicador algum e o tamanho das três partições. "
+  "Indicadores com suporte reduzido devem ser identificados nesta subseção, pois "
+  "condicionam a leitura das métricas.")
 p()
 tabela(
-    ["Partição", "Total", "Com disparo", "Sem disparo"],
+    ["Partição", "Total", "Com indicador", "Sem indicador"],
     [["Treino", "", "", ""], ["Validação", "", "", ""],
      ["Teste", "", "", ""], ["Total", "", "", ""]],
     [4.0, 4.0, 4.0, 4.0],
 )
-legenda("Tabela 6 — Composição do corpus por partição (a preencher).")
+legenda("Tabela 7 — Composição do corpus por partição (a preencher).")
 
-h(2, "12.2 Tarefa de escopo")
+h(2, "12.2 Desempenho por modelo e configuração")
 p("Reportar, para cada modelo e configuração, as métricas e a matriz de "
   "confusão. Destacar a configuração vencedora segundo o critério da seção 8.2 e "
   "discutir a distribuição dos dois tipos de erro à luz da assimetria "
@@ -852,22 +1139,41 @@ tabela(
     [[m["rotulo"], "", "", "", "", "", "", ""] for m in mod_treino.MODELOS.values()],
     [3.6, 1.6, 1.2, 1.6, 2.0, 1.8, 1.6, 2.0],
 )
-legenda("Tabela 7 — Desempenho na tarefa de escopo, melhor configuração por modelo "
-        "(a preencher).")
+legenda("Tabela 8 — Desempenho, melhor configuração por modelo (a preencher).")
 
-h(2, "12.3 Tarefa de motivação")
-p("Reportar as mesmas métricas e a matriz de confusão completa das "
-  f"{len(CATEGORIAS)} categorias. A análise deve privilegiar os pares de "
-  "categorias com maior confusão mútua, verificando se correspondem a fronteiras "
+h(2, "12.3 Desempenho por indicador")
+p("Reportar as médias macro e micro, as métricas por indicador e a matriz 2×2 de "
+  "cada um, conforme a seção 2.6. A análise deve privilegiar os indicadores com "
+  "maior taxa de falso negativo e verificar se correspondem a fronteiras "
   "reconhecidamente difíceis do manual de curadoria — hipótese que, se "
   "confirmada, indica revisão de critério de anotação em vez de limitação do "
-  "modelo.")
+  "modelo. O suporte de cada indicador no conjunto de teste deve ser reportado "
+  "ao lado da sua métrica, sem o que a leitura de um F1 isolado é enganosa.")
 
-h(2, "12.4 Tarefa de indicadores")
-p("Reportar as médias macro e micro, as métricas por indicador e a matriz 2×2 "
-  "de cada um, conforme a seção 2.6.")
+h(2, "12.4 Comparação entre as estratégias de ajuste")
+p("Reportar, para a mesma partição de teste, as médias macro das "
+  f"{len(mod_treino.ESTRATEGIAS)} estratégias descritas na seção 7.3, "
+  "acompanhadas do número de redes ajustadas e do tempo total de treino, de modo "
+  "que o eventual ganho seja confrontado com o seu custo. Reportar também as "
+  "métricas por indicador em cada estratégia, pois o ganho esperado da "
+  "independência entre redes concentra-se nos indicadores menos frequentes e "
+  "pode não aparecer na média.")
+p("Para a estratégia de comitê, reportar adicionalmente a distribuição da "
+  "concordância, a fração de decisões encaminhadas à revisão humana e o "
+  "desempenho que se obteria exigindo unanimidade. Sem esses três números, a "
+  "comparação com as demais estratégias é desigual: o comitê troca cobertura "
+  "automática por precisão, e o que ele deixa de decidir não aparece na métrica "
+  "de quem decide tudo.")
 
-h(2, "12.5 Contribuição da camada de modelo de linguagem")
+h(2, "12.5 Efeito das correções de desbalanceamento")
+p("Reportar as médias macro em quatro condições — com e sem ponderação da "
+  "perda, com e sem calibração do limiar por indicador — e, em cada uma, o "
+  "número médio de indicadores atribuídos por notícia ao lado do número médio "
+  "do gabarito. A comparação isola o quanto da atribuição insuficiente de "
+  "indicadores se deve à função de perda e o quanto se deve ao limiar de "
+  "decisão, questão distinta da capacidade de representação do modelo.")
+
+h(2, "12.6 Contribuição da camada de modelo de linguagem")
 p("Comparar a saída do classificador com a decisão final após a validação, "
   "quantificando em que proporção dos casos a camada confirma, corrige ou "
   "reverte a classificação. A comparação é viabilizada pela interface descrita "
@@ -929,9 +1235,11 @@ p("A contribuição metodológica central não está em um modelo específico, e
   "hiperparâmetros, métricas que não escondem classes raras e uma interface que "
   "expõe a decisão de cada camada isoladamente.")
 p("Como continuidade, destacam-se a anotação dupla com medida de concordância, a "
-  "ampliação do corpus nas categorias de menor suporte, a avaliação em fontes "
-  "não representadas no treino e a investigação de técnicas de balanceamento "
-  "para as categorias raras.")
+  "ampliação do corpus nos indicadores de menor suporte, a avaliação em fontes "
+  "não representadas no treino, a investigação de técnicas de balanceamento para "
+  "os indicadores raros e a construção de um conjunto de referência para a etapa "
+  "de extração — que hoje não tem métrica própria, por não haver gabarito dos "
+  "campos que o modelo de linguagem preenche.")
 
 quebra()
 
@@ -953,6 +1261,14 @@ for ref in [
     "Information Processing Systems, 2017.",
     "SOKOLOVA, M.; LAPALME, G. A systematic analysis of performance measures for "
     "classification tasks. Information Processing & Management, v. 45, n. 4, 2009.",
+    "TSOUMAKAS, G.; KATAKIS, I. Multi-label classification: an overview. "
+    "International Journal of Data Warehousing and Mining, v. 3, n. 3, 2007.",
+    "SECHIDIS, K.; TSOUMAKAS, G.; VLAHAVAS, I. On the stratification of "
+    "multi-label data. In: Machine Learning and Knowledge Discovery in Databases "
+    "(ECML PKDD), 2011.",
+    "LIPTON, Z. C.; ELKAN, C.; NARAYANASWAMY, B. Optimal thresholding of "
+    "classifiers to maximize F1 measure. In: Machine Learning and Knowledge "
+    "Discovery in Databases (ECML PKDD), 2014.",
     "BRASIL. Lei nº 8.069, de 13 de julho de 1990. Estatuto da Criança e do "
     "Adolescente.",
 ]:
@@ -965,17 +1281,21 @@ for ref in [
 quebra()
 
 # ----------------------------------------------------------------- apendices
-h(1, "Apêndice A — Categorias de motivação")
+h(1, "Apêndice A — Classes do classificador")
 p("Reprodução das definições utilizadas na anotação e no prompt do modelo de "
-  "linguagem. A coluna de desambiguação registra as fronteiras que mais geram "
-  "divergência.")
+  "linguagem, para os indicadores que o classificador aprende do texto. A coluna "
+  "de origem registra se a circunstância correspondente depende de o indicador "
+  "ter sido marcado.")
 p()
 tabela(
-    ["Categoria", "Definição", "Desambiguação"],
-    [[c["nome"], c["definicao"], c["nao_e"]] for c in CATEGORIAS],
-    [3.0, 6.5, 6.5],
+    ["Indicador", "Definição", "Circunstâncias que destrava"],
+    [[i["nome"], i["definicao"], ", ".join(i.get("circunstancias") or []) or "—"]
+     for i in INDICADORES_BERT],
+    [3.0, 7.5, 5.5],
 )
-legenda(f"Tabela 8 — As {len(CATEGORIAS)} categorias de motivação.")
+legenda(f"Tabela 9 — Os {len(INDICADORES_BERT)} indicadores que o classificador "
+        "aprende, e as circunstâncias que cada um autoriza o modelo de linguagem "
+        "a avaliar.")
 
 quebra()
 
@@ -991,7 +1311,7 @@ tabela(
      for i in INDICADORES],
     [4.2, 1.8, 10.0],
 )
-legenda("Tabela 9 — Indicadores e respectivos critérios.")
+legenda("Tabela 10 — Indicadores e respectivos critérios.")
 
 p("Os indicadores de regra são determinísticos e não dependem de modelo: "
   "vítima com menos de dezoito anos, vítima do gênero feminino, vítima agente "
@@ -1000,9 +1320,11 @@ p("Os indicadores de regra são determinísticos e não dependem de modelo: "
   "atualizam-se sozinhos quando a situação de uma vítima muda — uma pessoa "
   "ferida que vem a falecer pode converter a ocorrência em chacina.")
 p("Os indicadores de texto são os que exigem classificação e, portanto, os que "
-  "entram na avaliação da segunda etapa. O cadastro de novos indicadores de "
-  "texto exige exemplos anotados para retreinamento, requisito incorporado ao "
-  "fluxo da aplicação de gestão.")
+  "entram na avaliação. O cadastro de um indicador de texto novo exige exemplos "
+  "anotados para retreinamento, requisito incorporado ao fluxo da aplicação de "
+  "gestão: a classe criada nasce sem exemplo e o sistema recusa o treino "
+  "enquanto a classe mais rara não tiver o mínimo para ser representada nas três "
+  "partições.")
 
 quebra()
 
@@ -1012,29 +1334,31 @@ p()
 tabela(
     ["Situação", "Decisão"],
     [
-        ["Notícia relata tiro efetuado, com ou sem vítima atingida", "Escopo: sim"],
-        ["Ameaça com arma de fogo, sem disparo", "Escopo: não"],
-        ["Apreensão de arma ou munição, sem confronto", "Escopo: não"],
-        ["Morte ou lesão por arma branca ou outro meio", "Escopo: não"],
-        ["Bala perdida proveniente de confronto", "Escopo: sim; motivação segue o confronto de origem"],
-        ["Disparo acidental no manuseio da arma", "Escopo: sim; motivação disparo_acidental"],
-        ["Tiro para o alto, sem alvo", "Escopo: sim; motivação tiros_a_esmo"],
-        ["Polícia presente e atirando no momento do fato", "Motivação acao_operacao_policial"],
-        ["Polícia chega após o fato, apenas para atender", "Não caracteriza ação policial"],
-        ["Assalto em que se atira para intimidar", "Motivação roubo_tentativa, não ataque_a_civis"],
-        ["Morte como desfecho de outro motivo relatado", "O outro motivo é o principal"],
-        ["Texto insuficiente para decidir a motivação", "Rotular apenas o escopo; registrar a dúvida na observação"],
+        ["Notícia relata tiro efetuado, com ou sem vítima atingida", "No escopo: anotar os indicadores que o texto sustentar"],
+        ["Ameaça com arma de fogo, sem disparo", "Fora do escopo: nenhum indicador"],
+        ["Apreensão de arma ou munição, sem confronto", "Fora do escopo: nenhum indicador"],
+        ["Morte ou lesão por arma branca ou outro meio", "Fora do escopo: nenhum indicador"],
+        ["Ferido em queda, correria ou mal-estar durante o fato", "Não é vítima; a notícia pode estar no escopo por outra pessoa atingida"],
+        ["Ferido por estilhaço, vidro ou coronhada", "Não é vítima: o ferimento não é por disparo"],
+        ["Bala perdida proveniente de confronto", "No escopo; a vítima recebe a circunstância bala_perdida"],
+        ["Polícia presente e atirando no momento do fato", "Indicador acao_policial"],
+        ["Polícia chega após o fato, apenas para atender", "NÃO caracteriza ação policial"],
+        ["Policial atingido estando de folga", "NÃO é ação policial; é vitimização policial, calculada do tipo da vítima"],
+        ["Pessoa com menos de 18 anos atingida", "Indicador derivado da idade; basta registrar a idade ou a palavra criança/adolescente"],
+        ["Texto insuficiente para decidir um indicador", "Não marcar o indicador duvidoso; registrar a razão na observação"],
     ],
     [8.0, 8.0,],
 )
-legenda("Tabela 10 — Diretrizes para casos de fronteira.")
+legenda("Tabela 11 — Diretrizes para casos de fronteira.")
 
-p("Duas recomendações gerais. Primeiro, a motivação a registrar é a do fato que "
-  "originou os tiros, e não a do seu desfecho nem de acontecimentos anteriores "
-  "ou posteriores sem relação com o disparo. Segundo, em caso de dúvida "
-  "genuína, rotula-se o escopo e deixa-se a motivação em branco, registrando a "
-  "razão no campo de observação: um rótulo de motivação incerto prejudica mais a "
-  "segunda tarefa do que a sua ausência.")
+p("Três recomendações gerais. Primeiro, considera-se o que envolveu diretamente "
+  "o disparo, no momento em que ocorreu, e não antecedentes do envolvido nem "
+  "consequências posteriores que não constituam novo disparo. Segundo, em caso "
+  "de dúvida genuína sobre um indicador, não o marcar e registrar a razão na "
+  "observação: um rótulo incerto prejudica mais o treino do que a sua ausência. "
+  "Terceiro, a notícia que não recebe indicador algum NÃO é descarte — ela é o "
+  "exemplo negativo, e sem ela o classificador não aprende a recusar o que está "
+  "fora do escopo.")
 
 caminho = SAIDA / "TCC-Classificador-Violencia-Armada.docx"
 doc.save(caminho)
