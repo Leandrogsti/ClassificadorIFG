@@ -101,8 +101,14 @@ CREATE TABLE IF NOT EXISTS ocorrencia (
 
     -- MOTIVAÇÃO: fora de uso desde 06/10/2026. O sistema registra FENÔMENO
     -- OBSERVADO e CIRCUNSTÂNCIA, e nada mais. As duas colunas continuam aqui
-    -- para não perder o que bases antigas já gravaram; nada escreve nelas e
-    -- nada as lê.
+    -- para não perder o que bases antigas já gravaram: nada no fluxo da
+    -- aplicação escreve nelas nem as lê.
+    --
+    -- SOBRA UM USO FORA DAQUI: o template de `gerar_dicionario.py` ainda pede
+    -- `motivo_principal` à LLM, porque aquele script gera o dicionário das
+    -- categorias de motivação a partir das respostas dela. É ferramenta de
+    -- apoio, roda à parte e não grava nestas colunas — mas é o motivo de o
+    -- nome continuar aparecendo no repositório.
     motivo_principal       TEXT,
     motivos_complementares TEXT,
     divergencias           TEXT,

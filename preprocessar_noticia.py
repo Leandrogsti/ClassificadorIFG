@@ -129,23 +129,8 @@ TROCAS_OFUSCADAS = {"0": "o", "1": "i", "3": "e", "4": "a", "5": "s",
 # Emoji e pictogramas. Não carregam sinal de classificação e custam token.
 _CATEGORIAS_SIMBOLO = {"So", "Cf"}
 
-_nlp = None
 _termos_relevantes: set[str] | None = None
 _ruido = [re.compile(p, re.IGNORECASE) for p in PADROES_RUIDO]
-
-
-def _carregar_nlp():
-    """O spaCy só é carregado quando alguém realmente precisa dele.
-
-    A poda não usa spaCy: ela é por linha e por padrão. Quem usa é o
-    vocabulário do domínio, uma vez por processo.
-    """
-    global _nlp
-    if _nlp is None:
-        import spacy
-
-        _nlp = spacy.load("pt_core_news_sm")
-    return _nlp
 
 
 def _textos_do_dominio() -> list[str]:
