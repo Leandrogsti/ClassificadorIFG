@@ -7,7 +7,7 @@ Duas perguntas separadas, e confundi-las é o erro fácil aqui:
 - `circunstancia` — para CIRCUNSTÂNCIA das vítimas.
 
 **Quem decide** (`decidido_por`):
-- `bert` — classe do classificador. São as sete que entram no treino e no
+- `bert` — classe do classificador. São as oito que entram no treino e no
   corpus. O BERT marca e a LLM certifica.
 - `llm` — não tem classe no BERT. A LLM decide, dentro do bloco de outra
   classe que a mencione (violência de gênero é avaliada nos blocos de
@@ -18,7 +18,7 @@ Duas perguntas separadas, e confundi-las é o erro fácil aqui:
   derivá-los é exato, enquanto pedir ao modelo que os marque de novo só cria
   uma segunda resposta que pode contradizer a primeira.
 
-As sete classes do BERT ficam numa lista só porque o modelo é um só: separar
+As oito classes do BERT ficam numa lista só porque o modelo é um só: separar
 em dois classificadores exigiria dois treinos, duas divisões de corpus e duas
 matrizes de confusão para medir a mesma leitura do mesmo texto.
 

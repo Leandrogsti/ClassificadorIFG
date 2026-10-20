@@ -18,9 +18,10 @@ SÃO TRÊS GRUPOS DE TABELAS, com propósitos que não se misturam:
    que o usuário digitou e o texto. É o que permite guardar a notícia que não
    vira registro nenhum, e essa é justamente o exemplo negativo que ensina o
    classificador a recusar o que está fora do escopo. A coluna `estado` carrega
-   a faixa de concordância: `arquivo` (0 votos; acervo que não vai à LLM e
-   não conta como pendência), `alerta` (abaixo do corte), `com_fenomeno`,
-   `sem_fenomeno` (pessoa conferiu) e `virou_ocorrencia`.
+   a faixa de concordância. São SEIS: `na_fila` (ninguém olhou), `arquivo`
+   (0 votos; acervo que não vai à LLM e não conta como pendência), `alerta`
+   (abaixo do corte), `com_fenomeno` e `sem_fenomeno` (pessoa conferiu) e
+   `virou_ocorrencia`.
 
 3. TREINO E AUDITORIA — `corpus_noticia` (exemplo rotulado, com a partição
    treino/validação/teste fixada), `treino_execucao` (métricas de cada treino),
@@ -263,7 +264,11 @@ CREATE TABLE IF NOT EXISTS recebida (
     texto         TEXT NOT NULL,
     -- sha1 do texto normalizado: a mesma notícia não entra duas vezes na fila.
     impressao     TEXT,
+    -- Os SEIS estados (a lista viva está em recebidas.ESTADOS):
     -- na_fila        — ninguém olhou ainda
+    -- arquivo        — 0 votos do cluster; acervo, não vai à LLM e não é
+    --                  pendência de ninguém
+    -- alerta         — votos abaixo do corte: um voto só, vai a uma pessoa
     -- com_fenomeno   — tem indicador: pode virar ocorrência
     -- sem_fenomeno   — lida e sem indicador nenhum; fica guardada como
     --                  exemplo negativo, não vira ocorrência

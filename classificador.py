@@ -20,10 +20,17 @@ prompt leva um núcleo fixo e dois ou três blocos — e o núcleo, por ser semp
 igual e vir primeiro, é o que a API consegue manter em cache entre chamadas.
 
 O ORÇAMENTO É APERTADO e isso explica várias decisões deste arquivo. O plano da
-Groq em uso dá 8.000 tokens POR MINUTO. Sem marcação do BERT o prompt fica em
-~5.400 tokens e cabe uma classificação por minuto; com duas classes marcadas cai
-para ~4.200. Cada bloco que não viaja é folga para o modelo raciocinar, e
-raciocinar é o que estabiliza a lista de vítimas.
+Groq em uso dá 8.000 tokens POR MINUTO. Medido sem o texto da notícia (a tabela
+completa está no README):
+
+    sem modelo treinado      catálogo inteiro viaja    ~6.750 tokens
+    duas classes marcadas    só os blocos delas        ~4.620 tokens
+    nenhuma classe marcada   só o núcleo fixo          ~3.540 tokens
+
+As duas últimas linhas NÃO são o mesmo caso: "sem modelo treinado" é não haver
+quem marque, e então tudo viaja; "nenhuma classe marcada" é o BERT ter lido e
+descartado, e aí viaja o mínimo. Cada bloco que não viaja é folga para o modelo
+raciocinar, e raciocinar é o que estabiliza a lista de vítimas.
 
 A cada notícia adicionada, a LLM relê TODAS as notícias da ocorrência juntas e
 refaz a lista de vítimas do zero. Isso custa mais tokens do que processar só a

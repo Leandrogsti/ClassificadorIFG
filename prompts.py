@@ -300,12 +300,12 @@ ou são calculadas pelo sistema a partir da lista de vítimas.
     "tabela_agente": {
         "rotulo": "Tabela complementar — vítima agente de segurança",
         "descricao": (
-            "Entra no prompt mestre, no lugar de `{tabelas_vitima}`. Viaja em"
-            " TODA chamada, e é a maior peça que ainda NÃO é condicionada:"
-            " ~940 tokens com as listas fechadas. Para ela viajar só quando"
-            " vale seria preciso uma classe de BERT para “agente baleado” —"
-            " `acao_policial` não serve, porque policial baleado de folga é"
-            " vitimização policial e não é ação policial."
+            "Entra no prompt mestre, no lugar de `{tabelas_vitima}`. Desde"
+            " 2026-10-09 viaja SÓ quando o BERT marca `vitimizacao_policial`,"
+            " que virou classe justamente para condicioná-la: são ~940 tokens"
+            " com as listas fechadas, a maior peça condicionável do prompt."
+            " `acao_policial` não serviria de condição, porque policial"
+            " baleado de folga é vitimização policial e não é ação policial."
         ),
         "texto": """Quando a vítima tiver `agente`, é OBRIGATÓRIO acrescentar DENTRO dela a chave
 `vitimizacao_policial`, com os quatro campos. Não deixe de mandá-la: o sistema

@@ -7,7 +7,7 @@ corrigindo o classificador ou apenas repetindo-o.
 O resultado é MULTIRRÓTULO e é sempre a lista inteira: cada indicador passa pela
 sua própria sigmoide, é comparado com o SEU limiar e entra ou não entra sozinho.
 Nenhuma classe exclui outra, não há `argmax` e a varredura não para no primeiro
-indicador que passa — uma notícia pode sair com nenhum, com um ou com os sete.
+indicador que passa — uma notícia pode sair com nenhum, com um ou com os oito.
 Nenhum indicador acima do limiar é uma resposta legítima: quer dizer que a
 notícia está fora do escopo.
 
@@ -23,7 +23,10 @@ qual delas está em produção:
 - `por_indicador` — uma rede binária por indicador. Todas são consultadas
   para a mesma notícia e as respostas são reunidas num vetor só, o que custa
   uma passagem e uma rede na memória por indicador — perto de 3,5 GB com o
-  BERTimbau base e os oito atuais. Mesmo formato de saída da outra estratégia.
+  BERTimbau base e os oito atuais. Mesmo formato de saída das outras duas.
+- `cluster` — três modelos por indicador, votando. Carrega um trio por vez,
+  e não as 24 redes de uma vez: 2 votos marcam o indicador, 1 manda o caso
+  para revisão humana.
 
 Os modelos ficam em memória depois do primeiro uso, porque carregar um BERT a
 cada requisição levaria segundos.
@@ -193,7 +196,7 @@ def _carregar(tarefa: str) -> dict:
     rotulos = descricao["rotulos"]
 
     if descricao["estrategia"] == "cluster":
-        # NADA é carregado aqui. Três modelos por indicador dão 21 redes e ~15 GB,
+        # NADA é carregado aqui. Três modelos por indicador dão 24 redes e ~15 GB,
         # e a placa tem 8. O que se guarda é o mapa; quem carrega é `prever`, um
         # grupo de três por vez — cerca de 2,2 GB, que caba com folga.
         grupos: dict[str, list[dict]] = {nome: [] for nome in rotulos}

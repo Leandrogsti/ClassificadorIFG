@@ -8,23 +8,25 @@ MULTIRRÓTULO, NÃO MULTICLASSE. É a decisão que organiza o arquivo todo. A
 pergunta não é "qual é o indicador desta notícia", e sim "quais destes oito ela
 sustenta". Cada indicador tem a sua própria saída, passa pela sua própria
 sigmoide e decide sozinho se entra, sem disputar com os outros: uma notícia pode
-sair com nenhum, com um ou com os sete. Não há `softmax`, não há `argmax` e não
+sair com nenhum, com um ou com os oito. Não há `softmax`, não há `argmax` e não
 há nada que pare a leitura depois do primeiro indicador marcado.
 
-Duas ESTRATÉGIAS de treino produzem esse mesmo tipo de saída, e as duas estão
+Três ESTRATÉGIAS de treino produzem esse mesmo tipo de saída, e as três estão
 implementadas para que a escolha entre elas seja um resultado medido do
 trabalho, e não um palpite:
 
-- `unico` — UMA rede com sete saídas sigmoide. O encoder é compartilhado, então
+- `unico` — UMA rede com oito saídas sigmoide. O encoder é compartilhado, então
   o que o modelo aprende sobre a linguagem das notícias serve a todos os
   indicadores, e há um treino só. É o padrão.
-- `por_indicador` — SETE redes binárias independentes (um-contra-resto). Cada
+- `por_indicador` — OITO redes binárias independentes (um-contra-resto). Cada
   indicador ganha um modelo inteiro, com o seu próprio ponto de parada e o seu
   próprio limiar, e um indicador raro não disputa a capacidade da rede com os
-  frequentes. Custa sete treinos, sete checkpoints em disco e sete redes
+  frequentes. Custa oito treinos, oito checkpoints em disco e oito redes
   carregadas na memória durante a inferência.
+- `cluster` — TRÊS modelos por indicador, votando. Um indicador entra quando 2
+  dos 3 o marcam; com 1 voto o caso vai para revisão humana.
 
-Duas correções valem para as DUAS estratégias e, em corpus pequeno e
+Duas correções valem para as TRÊS estratégias e, em corpus pequeno e
 desbalanceado, pesam mais que a escolha entre elas:
 
 1. PESO DAS CLASSES na perda (`pos_weight`). Com 20 exemplos de um indicador
@@ -97,7 +99,8 @@ MODELOS_CLUSTER = ["albertina-100m", "bertimbau-base", "bertimbau-large"]
 # A FRAÇÃO dos modelos que precisa concordar para a classe seguir sozinha para a
 # LLM. 2 de 3, por decisão da usuária em 2026-10-07:
 #
-#     0 votos  -> vermelho, revisão obrigatória por pessoa
+#     0 votos  -> `arquivo`: acervo, não vai à LLM e não entra na fila de
+#                  ninguém; volta a ser avaliado quando houver modelo novo
 #     1 voto   -> laranja, alerta; pessoa verifica
 #     2 ou 3   -> segue para a LLM
 #
@@ -309,7 +312,7 @@ def _conjunto(exemplos: list[dict], rotulos: list[str]) -> dict:
 
     Recebe os exemplos já lidos do banco em vez de consultá-lo: na estratégia
     `por_indicador` a mesma partição é codificada uma vez por indicador, e
-    reconsultar o banco sete vezes não mudaria nada além do tempo.
+    reconsultar o banco oito vezes não mudaria nada além do tempo.
     """
     return {
         "textos": [e["texto"] for e in exemplos],
@@ -337,8 +340,12 @@ def _pesos_positivos(rotulos_codificados: list[list[float]]) -> list[float]:
     ]
 
 
-def _calibrar_limiares(y, probabilidades, rotulos: list[str]) -> dict[str, float]:
+def _calibrar_limiares(y, probabilidades, rotulos: list[str]) -> dict:
     """O limiar de CADA indicador, escolhido pelo F1 dele na validação.
+
+    Devolve `{'limiares': {indicador: corte}, 'motivos': {indicador: por quê}}`
+    — e não só o mapa de cortes: o motivo é o que distingue um limiar calibrado
+    de um que ficou no padrão por falta de positivo na validação.
 
     Varre os candidatos de baixo para cima e guarda o primeiro que atinge o
     melhor F1. Empate fica com o limiar MAIS BAIXO de propósito: aqui um falso
@@ -519,8 +526,8 @@ def _ajustar(modelo: str, hiper: dict, rotulos: list[str], conjuntos: dict,
 
 
 def _descartar(cabeca: dict, aparelho: str) -> None:
-    """Solta a rede da memória. Em `por_indicador` são sete redes em sequência:
-    sem isto, a sétima não cabe na placa."""
+    """Solta a rede da memória. Em `por_indicador` são oito redes em sequência:
+    sem isto, a oitava não cabe na placa."""
     import torch
 
     cabeca.pop("rede", None)
@@ -543,9 +550,9 @@ def _apurar_cluster(probabilidades_voto: dict, exemplos: dict,
     discordância é justamente o sinal que manda o caso para uma pessoa.
 
     Devolve o voto por indicador e a decisão em três faixas:
-        0 votos            ausente
-        1 ou 2 votos       vai para revisão humana
-        3 votos            classificado
+        0 votos            ausente — não vai a pessoa nenhuma
+        1 voto             vai para revisão humana
+        2 ou 3 votos       classificado
     """
     from sklearn.metrics import f1_score
 
@@ -720,8 +727,8 @@ def treinar(
             probabilidades_voto[rotulos_unidade[0]][nome_unidade] = {}
 
     # Matriz conjunta: uma coluna por indicador, preenchida pela unidade que o
-    # treinou. Em `por_indicador` é aqui que as sete saídas binárias voltam a
-    # ser um vetor multirrótulo — e é por isso que o resultado final das duas
+    # treinou. Em `por_indicador` é aqui que as oito saídas binárias voltam a
+    # ser um vetor multirrótulo — e é por isso que o resultado final das três
     # estratégias tem exatamente a mesma forma.
     conjunta = {
         particao: {
@@ -1093,8 +1100,8 @@ def _chave_de_selecao(resultado: dict) -> float:
 def placar(execucoes: list[dict]) -> list[dict]:
     """O melhor resultado de CADA par (estratégia, modelo), já ordenado.
 
-    A tabela completa lista toda execução da grade: com seis modelos e quatro
-    configurações são 24 linhas por estratégia, e descobrir ali qual MODELO
+    A tabela completa lista toda execução da grade: com três modelos e quatro
+    configurações são 12 linhas por estratégia, e descobrir ali qual MODELO
     ganha exige comparar à mão as quatro linhas de cada um. Esta reduz a uma
     linha por modelo — a melhor configuração dele — e ordena pelo mesmo critério
     que o treino usa para escolher os pesos que vão para produção: F1 macro na
@@ -1227,8 +1234,8 @@ def rodar_comparacao(
         if salvar_melhor:
             # Retreina a configuração vencedora só para gravar os pesos; a
             # métrica reportada continua sendo a da execução original. Em
-            # `por_indicador` isso significa ajustar as sete redes de novo — é
-            # o preço de não guardar sete checkpoints de cada execução.
+            # `por_indicador` isso significa ajustar as oito redes de novo — é
+            # o preço de não guardar oito checkpoints de cada execução.
             treinar(
                 con, tarefa, melhor["modelo"], melhor["hiperparametros"],
                 dispositivo, salvar_modelo=True, registrar=False,

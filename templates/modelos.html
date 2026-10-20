@@ -65,6 +65,15 @@
           {{ estatisticas.indicadores | length }} redes carregadas na memória
         </td>
       </tr>
+      <tr>
+        <td><code>cluster</code></td>
+        <td>Três modelos por indicador, votando (2 de 3 marcam)</td>
+        <td>{{ estatisticas.indicadores | length * 3 }}</td>
+        <td class="suave">
+          {{ estatisticas.indicadores | length * 3 }} treinos; na inferência
+          carrega um trio por vez, não todos de uma vez
+        </td>
+      </tr>
     </tbody>
   </table>
   </div>
@@ -125,11 +134,14 @@
     não interrompe as demais, de modo que a comparação completa sai de uma só
     chamada, mesmo que algum modelo não caiba no equipamento.
   </p>
-  <pre class="comando"># sorteia a divisão e compara os 6 modelos na estratégia padrão
+  <pre class="comando"># sorteia a divisão e compara os 3 modelos na estratégia padrão
 python rodar_treino.py --dividir
 
-# compara as DUAS estratégias na mesma partição de teste
+# compara as duas de rede única na mesma partição de teste
 python rodar_treino.py --estrategia ambas --grade 1
+
+# as TRÊS, incluindo o cluster, na mesma tabela
+python rodar_treino.py --estrategia todas --grade 1
 
 # um modelo por indicador, uma configuração só
 python rodar_treino.py --estrategia por_indicador --modelo bertimbau-base --grade 1
@@ -144,7 +156,7 @@ python rodar_treino.py --sem-peso-classes --sem-calibrar-limiar --grade 1</pre>
     modelo vão para <code>modelos/indicadores</code>, com um
     <code>modelo.json</code> que diz a estratégia, a ordem dos rótulos e o
     limiar de cada indicador — é esse manifesto que a aplicação lê em produção
-    para marcar a notícia antes de chamar a LLM. As duas estratégias convivem em
+    para marcar a notícia antes de chamar a LLM. As três estratégias convivem em
     disco, em subpastas separadas: treinar uma não apaga a outra, e o manifesto
     é o que decide qual responde. Falhas (falta de memória na GPU, por exemplo)
     também são registradas — um modelo que não cabe na placa é resultado, não

@@ -459,8 +459,9 @@ p("A notícia entra por uma fila de recebidas, com o endereço eletrônico, a da
   "informada e o texto integral. O classificador a lê e atribui, a cada "
   "indicador, uma decisão que não é binária: na estratégia de comitê, conta-se "
   "quantos dos três modelos marcaram aquele indicador, e a notícia é encaminhada "
-  "conforme a concordância — nenhum voto exige revisão humana, voto isolado gera "
-  "alerta a ser verificado, e dois ou três seguem adiante. Somente o que segue "
+  "conforme a concordância — nenhum voto arquiva a notícia como acervo, sem "
+  "gerar pendência, voto isolado gera alerta a ser verificado, e dois ou três "
+  "seguem adiante. Somente o que segue "
   "chega ao modelo de linguagem, e ele recebe apenas as instruções dos "
   "indicadores marcados. Sua tarefa é aprofundá-los: montar a lista de pessoas "
   "atingidas, preencher a ficha de cada uma e as tabelas complementares. O "
@@ -474,7 +475,7 @@ tabela(
         ["1. Recebimento", "humana", "Analista informa endereço eletrônico, data e texto."],
         ["2. Marcação", "automática", "Classificador multirrótulo atribui indicadores."],
         ["3. Triagem", "automática", "Encaminhamento por faixa de concordância."],
-        ["4. Revisão da faixa", "humana", "Confirmação do que ficou sem voto ou com voto isolado."],
+        ["4. Revisão da faixa", "humana", "Verificação do que recebeu voto isolado."],
         ["5. Abertura", "humana", "Analista informa data e endereço da ocorrência."],
         ["6. Aprofundamento", "automática", "Modelo de linguagem extrai vítimas e campos estruturados."],
         ["7. Verificação", "humana", "Analista confere e corrige a lista de vítimas."],
@@ -581,21 +582,25 @@ p("A anotação é feita em interface própria, integrada à aplicação, que cu
   "visível ao lado da respectiva caixa durante a anotação, o que reduz a "
   "dependência de memória, e a tela afirma explicitamente que não marcar nada é "
   "uma decisão válida, não uma pendência.")
-p("A fila é ordenada por gravidade, não por data. Quando há modelo treinado, a "
-  "notícia em que o classificador não marcou indicador algum aparece primeiro, "
-  "sinalizada em vermelho: é o falso negativo, o erro mais custoso de não "
-  "examinar, porque o indicador que o classificador não marca não chega a ser "
-  "avaliado pela etapa seguinte. Em seguida vem o que recebeu voto isolado no "
-  "comitê, sinalizado em laranja. A rotulagem feita nessa fila alimenta "
+p("A fila é ordenada por pendência, não por data. Aparece primeiro a notícia "
+  "que recebeu voto isolado no comitê, sinalizada em laranja, e em seguida a "
+  "que ninguém examinou ainda. A notícia em que nenhum indicador foi marcado "
+  "não ocupa a fila: fica retida como acervo, ao final da listagem, e é "
+  "reavaliada quando há modelo novo — o falso negativo não é descartado, mas "
+  "também não disputa a atenção de quem trabalha a fila. A rotulagem feita nessa fila alimenta "
   "diretamente o corpus, de modo que o trabalho de conferência e o de construção "
   "do conjunto de treino são o mesmo trabalho.")
 p("A interface informa, por tarefa, se o corpus já sustenta uma medição "
   f"honesta. O limiar adotado é de {mod_corpus.MINIMO_POR_CLASSE} exemplos por "
   "classe para considerar a métrica estável, e de três exemplos como mínimo "
   "absoluto para que a classe possa ser representada nas três partições. O "
-  "critério é informativo: abaixo de uma dezena de exemplos no conjunto de "
-  "teste, a variação de um único acerto desloca o recall em dezenas de pontos "
-  "percentuais, e relatar tal número como resultado seria enganoso.")
+  "critério NÃO é informativo: desde outubro de 2026 o treino é recusado "
+  "enquanto qualquer classe do conjunto pedido estiver abaixo do mínimo. A "
+  "razão é que, abaixo de uma dezena de exemplos no conjunto de teste, a "
+  "variação de um único acerto desloca o recall em dezenas de pontos "
+  "percentuais, e relatar tal número como resultado seria enganoso. Treinar "
+  "um subconjunto de classes já maduras continua possível, pela opção "
+  "--classe, que aplica a trava apenas às classes pedidas.")
 
 h(2, "4.6 Dimensionamento esperado")
 p(f"São {len(INDICADORES_BERT)} indicadores, e a exigência amostral se conta por "
@@ -609,7 +614,7 @@ p("Indicadores raros na realidade — e portanto raros no corpus — devem ser "
   "reportados com o seu suporte explícito, e a discussão dos resultados precisa "
   "distinguir limitação do modelo de insuficiência amostral. O sistema não "
   "permite treinar com menos de três exemplos da classe mais rara, por não haver "
-  "como representá-la nas três partições, e sinaliza como instável toda classe "
+  "como representá-la nas três partições, e recusa o treino de toda classe "
   f"com menos de {mod_corpus.MINIMO_POR_CLASSE} exemplos.")
 
 quebra()
@@ -770,7 +775,7 @@ p("A consequência arquitetural é a escolha da função de ativação da camada
   "a entropia cruzada binária aplicada a cada saída.")
 
 h(2, "7.3 Estratégias de ajuste comparadas")
-p("Duas estratégias produzem essa mesma forma de saída, e ambas são "
+p("Três estratégias produzem essa mesma forma de saída, e todas são "
   "implementadas e submetidas à mesma partição de teste, de modo que a escolha "
   "entre elas seja resultado medido e não suposição.")
 p()
@@ -809,8 +814,9 @@ p("A terceira estratégia submete a mesma notícia a três arquiteturas distinta
   "separadamente. Essa separação é deliberada: um limiar comum às três faria com "
   f"que discordassem menos por construção, e a discordância é o sinal "
   "procurado. A decisão resultante tem três faixas, e não duas — nenhum voto "
-  "encaminha a notícia à revisão humana, voto abaixo do corte gera alerta a ser "
-  "verificado, e a partir do corte o indicador segue automaticamente. O preço é "
+  "arquiva a notícia como acervo, sem gerar pendência, voto abaixo do corte "
+  "gera alerta a ser verificado, e a partir do corte o indicador segue "
+  "automaticamente. O preço é "
   "explícito nas métricas, que reportam a fração de decisões não automáticas ao "
   "lado do desempenho.")
 p("A viabilidade do comitê depende de um detalhe de implementação: as redes são "
@@ -980,8 +986,9 @@ p("A assimetria entre os dois tipos de erro é relevante para a escolha "
   "humana podem recusá-la. O falso negativo é perda definitiva, porque a classe "
   "que não foi marcada não chega a ser avaliada por ninguém. Essa consideração "
   "orienta duas decisões do sistema: a priorização do recall na calibração do "
-  "limiar, que em caso de empate escolhe o corte mais baixo, e o encaminhamento à "
-  "revisão humana de toda notícia em que nenhum indicador foi marcado.")
+  "limiar, que em caso de empate escolhe o corte mais baixo, e a retenção em "
+  "acervo — e não o descarte — de toda notícia em que nenhum indicador foi "
+  "marcado, de modo que um modelo posterior possa reavaliá-la.")
 
 h(2, "9.3 Avaliação interativa")
 p("Além das métricas agregadas, a aplicação disponibiliza interface de teste "
@@ -1053,11 +1060,14 @@ h(2, "11.2 Execução dos experimentos")
 p("A comparação completa é disparada por linha de comando, com as variações "
   "abaixo:")
 codigo([
-    "# sorteia a divisão e compara os seis modelos",
+    "# sorteia a divisão e compara os três modelos",
     "python rodar_treino.py --dividir",
     "",
-    "# compara as duas estratégias de ajuste na mesma partição de teste",
+    "# compara as duas de rede única na mesma partição de teste",
     "python rodar_treino.py --estrategia ambas --grade 1",
+    "",
+    "# as três, incluindo o comitê, na mesma tabela",
+    "python rodar_treino.py --estrategia todas --grade 1",
     "",
     "# ajusta uma rede binária por indicador",
     "python rodar_treino.py --estrategia por_indicador --grade 1",

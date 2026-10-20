@@ -10,10 +10,11 @@ mesma partição de teste:
 
     unico          uma rede com uma saída sigmoide por indicador (padrão)
     por_indicador  uma rede binária por indicador (um-contra-resto)
+    cluster        três modelos por indicador, votando (2 de 3 marcam)
 
 Exemplos:
 
-    # divide o corpus e compara os 6 modelos na estratégia padrão
+    # divide o corpus e compara os 3 modelos na estratégia padrão
     python rodar_treino.py --dividir
 
     # compara as DUAS estratégias: é este o experimento que responde se vale
@@ -51,9 +52,9 @@ def main() -> None:
         "--estrategia", default="unico",
         choices=[*treinamento.ESTRATEGIAS, "ambas", "todas"],
         help="unico: uma rede multirrótulo; por_indicador: uma rede binária por"
-             " indicador; cluster: três modelos por indicador, votando, e só"
-             " unanimidade classifica; ambas: unico + por_indicador; todas:"
-             " as três",
+             " indicador; cluster: três modelos por indicador, votando — 2 de 3"
+             " classificam e 1 voto manda o caso a uma pessoa; ambas: unico +"
+             " por_indicador; todas: as três",
     )
     analisador.add_argument(
         "--modelo", action="append", choices=list(treinamento.MODELOS),

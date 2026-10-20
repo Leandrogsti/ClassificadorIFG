@@ -100,7 +100,7 @@ aplica a mesma trava só ao subconjunto pedido.
 flowchart TD
     START["/modelos · Treinar agora"]
     SUB["Subprocesso em segundo plano<br/><small>rodar_treino.py</small>"]
-    PRONTO{"Prontidão:<br/>3+ exemplos por classe?"}
+    PRONTO{"Prontidão:<br/>30+ positivos por classe pedida?"}
     PARA["Recusa e diz o que falta"]
 
     DIV["Divisão 70/15/15<br/><small>só o que ainda não tem partição</small>"]
@@ -144,8 +144,10 @@ respondendo e um treino que falha morre sozinho.
 
 **Prontidão antes de tudo.** São precisos ao menos 3 exemplos da classe mais
 rara — um para cada partição. Abaixo de 30, a métrica daquela classe é ruído:
-com 4 exemplos no teste, acertar 3 ou 4 move o recall de 0,75 para 1,00. O
-número não trava nada, só avisa.
+com 4 exemplos no teste, acertar 3 ou 4 move o recall de 0,75 para 1,00. Desde
+14/10/2026 o número TRAVA: o treino é recusado enquanto alguma classe pedida
+estiver abaixo de 30. Para treinar só as classes já maduras, use `--classe`,
+que aplica a trava apenas ao que foi pedido.
 
 **Divisão 70/15/15, e só do que falta.** Resortear tudo a cada treino mudaria o
 conjunto de teste, e dois modelos medidos em testes diferentes não são

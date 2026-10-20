@@ -8,9 +8,10 @@ estiver aqui, está no lugar errado.
 O CAMINHO DE UMA NOTÍCIA, na ordem em que as telas aparecem:
 
 1. `/recebidas` — a notícia entra com link, data e texto. O BERT olha e a
-   classifica numa de três faixas: vermelho (0 votos, pessoa revisa), laranja
-   (abaixo do corte, pessoa verifica) ou segue. Sem modelo treinado, tudo cai
-   na fila para uma pessoa — e é essa rotulagem que constrói o corpus.
+   classifica numa de três faixas: `arquivo` (0 votos — acervo, não vai à LLM
+   e NÃO é pendência de ninguém), `alerta` (abaixo do corte, pessoa verifica)
+   ou segue. Sem modelo treinado, tudo cai na fila para uma pessoa — e é essa
+   rotulagem que constrói o corpus.
 2. `/ocorrencia/nova` — a notícia com fenômeno vira registro. Aqui se pede o
    endereço, que é o que não se sabe antes de ler o texto.
 3. `/ocorrencia/<id>` — a LLM aprofunda as classes marcadas: monta a lista de

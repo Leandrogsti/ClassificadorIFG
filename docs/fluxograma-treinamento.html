@@ -98,7 +98,7 @@
 <div class="diagrama"><pre class="mermaid">flowchart TD
     START[&quot;/modelos · Treinar agora&quot;]
     SUB[&quot;Subprocesso em segundo plano&lt;br/&gt;&lt;small&gt;rodar_treino.py&lt;/small&gt;&quot;]
-    PRONTO{&quot;Prontidão:&lt;br/&gt;3+ exemplos por classe?&quot;}
+    PRONTO{&quot;Prontidão:&lt;br/&gt;30+ positivos por classe pedida?&quot;}
     PARA[&quot;Recusa e diz o que falta&quot;]
 
     DIV[&quot;Divisão 70/15/15&lt;br/&gt;&lt;small&gt;só o que ainda não tem partição&lt;/small&gt;&quot;]
@@ -133,7 +133,7 @@
     class PARA nao;</pre></div>
 <h3>Por que cada passo está ali</h3>
 <p><strong>Subprocesso em segundo plano.</strong> O treino leva minutos e carrega um BERT inteiro. Dentro da requisição, ele penduraria o navegador e derrubaria o servidor junto se estourasse a memória. Em processo separado, a aplicação segue respondendo e um treino que falha morre sozinho.</p>
-<p><strong>Prontidão antes de tudo.</strong> São precisos ao menos 3 exemplos da classe mais rara — um para cada partição. Abaixo de 30, a métrica daquela classe é ruído: com 4 exemplos no teste, acertar 3 ou 4 move o recall de 0,75 para 1,00. O número não trava nada, só avisa.</p>
+<p><strong>Prontidão antes de tudo.</strong> São precisos ao menos 3 exemplos da classe mais rara — um para cada partição. Abaixo de 30, a métrica daquela classe é ruído: com 4 exemplos no teste, acertar 3 ou 4 move o recall de 0,75 para 1,00. Desde 14/10/2026 o número TRAVA: o treino é recusado enquanto alguma classe pedida estiver abaixo de 30. Para treinar só as classes já maduras, use <code>--classe</code>, que aplica a trava apenas ao que foi pedido.</p>
 <p><strong>Divisão 70/15/15, e só do que falta.</strong> Resortear tudo a cada treino mudaria o conjunto de teste, e dois modelos medidos em testes diferentes não são comparáveis — um modelo avaliado na semana passada teria sido medido num teste que já não existe. A estratificação é por classe e uma notícia por vez, começando pela <strong>mais rara</strong>: é o que garante exemplo dela nas três partições. Sem exemplo na validação não há limiar para calibrar; sem exemplo no teste não há métrica para reportar.</p>
 <p><strong>Codificação em vetor.</strong> Lista de nomes vira vetor de 0 e 1, uma posição por indicador. É multirrótulo, não multiclasse: a pergunta não é &quot;qual é o indicador desta notícia&quot; e sim &quot;quais destes oito ela sustenta&quot;. Vetor todo zero é o exemplo negativo, e é válido.</p>
 <p><strong><code>pos_weight</code> na perda.</strong> Com 20 exemplos de um indicador contra 400 sem ele, a perda não ponderada é quase minimizada por um modelo que <strong>nunca o marca</strong> — e o sintoma disso é o clássico &quot;só sai um indicador&quot;. O peso é a razão entre negativos e positivos, com teto de 10 para que uma classe com 2 exemplos não domine o gradiente.</p>

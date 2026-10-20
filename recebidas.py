@@ -19,8 +19,10 @@ começo e é esse o trabalho que constrói o corpus: cada rotulagem aqui vira
 exemplo de treino, inclusive — e principalmente — a que conclui que não há
 fenômeno nenhum.
 
-ESTADOS
+ESTADOS (seis; a lista viva é `ESTADOS`, logo abaixo)
     na_fila          ninguém olhou ainda
+    arquivo          0 votos: acervo, não vai à LLM e não conta como pendência
+    alerta           votos abaixo do corte; a dúvida vai a uma pessoa
     com_fenomeno     tem indicador; pode virar ocorrência
     sem_fenomeno     lida e sem indicador; fica guardada, não vira ocorrência
     virou_ocorrencia já é um registro de produção
@@ -297,9 +299,11 @@ def contar(con, filtros: dict | None = None) -> int:
 def listar(con, filtros: dict | None = None, limite=None,
            deslocamento: int = 0) -> list[dict]:
     onde, parametros = _clausulas(filtros or {})
-    # Ordem por GRAVIDADE da faixa, não por data: vermelho primeiro, depois
-    # laranja, depois o que já está resolvido. Quem abre a tela tem de ver antes
-    # o que o modelo descartou, que é o erro mais caro de não olhar.
+    # Ordem por PENDÊNCIA, não por data: primeiro o que espera uma pessoa —
+    # `alerta` (voto isolado, a dúvida do modelo) e depois `na_fila` (ninguém
+    # olhou). Em seguida o que já foi resolvido, e por último `arquivo`, que é
+    # acervo: fica acessível para reavaliação, mas não disputa a atenção de
+    # quem abre a tela para trabalhar a fila.
     consulta = (
         f"SELECT * FROM recebida{onde}"
         " ORDER BY CASE estado"
