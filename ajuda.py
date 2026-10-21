@@ -866,6 +866,13 @@ TELAS["corpus_repositorio"] = {
          " colunas 'texto' e 'indicadores'. A importação tem uma caixa de 'já"
          " aprovar', que só deve ser marcada se aquele corpus já foi revisado"
          " fora daqui."),
+        ("Baixar o corpus",
+         "A planilha sai com o texto, os indicadores, o anotador — e também"
+         " com a APROVAÇÃO (se está aprovada, por quem e quando) e o CONJUNTO"
+         " de cada notícia: treino, validação ou teste. São essas duas"
+         " últimas que permitem reproduzir a medição fora daqui; sem elas, a"
+         " planilha seria a lista das notícias e não o corpus que gerou os"
+         " números."),
         ("A lista e a coluna de aprovação",
          "Cada linha tem um botão de Aprovar (ou Devolver, se já aprovada). O"
          " filtro 'Esperando revisão' isola exatamente o que falta revisar."

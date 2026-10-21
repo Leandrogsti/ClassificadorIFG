@@ -1478,9 +1478,18 @@ def corpus_dividir():
     return redirect(url_for("corpus_repositorio"))
 
 
+# A planilha do corpus leva TAMBÉM a aprovação e a partição. Sem elas o anexo
+# do TCC não reproduz a medição: `aprovada` é a condição de treino (só o
+# aprovado treina) e `particao` é o sorteio que separa treino, validação e
+# teste. Uma planilha sem as duas é a lista das notícias, não o corpus que
+# gerou os números — e reimportá-la perderia o trabalho de revisão do sênior.
+# `aprovada_por` e `aprovada_em` vão junto porque é quem assinou, e é isso que
+# distingue rótulo revisado de rótulo apenas digitado.
 COLUNAS_CORPUS = [
     ("id", "ID"), ("link", "Link"), ("texto", "Texto"),
     ("indicadores", "Indicadores"), ("rotulada", "Anotada"),
+    ("aprovada", "Aprovada"), ("aprovada_por", "Aprovada por"),
+    ("aprovada_em", "Aprovada em"),
     ("particao", "Conjunto"), ("anotador", "Anotador"), ("criado_em", "Criado em"),
 ]
 

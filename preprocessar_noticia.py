@@ -169,8 +169,18 @@ def _textos_do_dominio() -> list[str]:
         # mais estreito, e isso é degradação, não falha.
         pass
 
-    # Só o NOME da categoria antiga, pela mesma razão: a definição dela é prosa
-    # e traria verbo genérico de volta para o veto.
+    # AS 15 CATEGORIAS DE MOTIVAÇÃO, EXTINTAS EM 06/10/2026, continuam aqui de
+    # propósito, e isto não é resíduo esquecido. Elas NÃO são lidas como
+    # categorias: o que se aproveita são os nomes delas — "roubo tentativa",
+    # "disputa", "bala perdida" — como VOCABULÁRIO DO DOMÍNIO, para decidir se
+    # uma linha do texto fala do fato ou é menu de site. Esse vocabulário não
+    # envelheceu junto com o conceito: um texto sobre assalto continua a falar
+    # de assalto. Removê-los estreitaria o veto e mudaria o que é podado, e a
+    # poda é medida por `avaliar_extracao.py` — mexer aqui exige rodar a
+    # medição antes e depois.
+    #
+    # Só o NOME, pela mesma razão de sempre: a definição é prosa e traria
+    # verbo genérico de volta para o veto.
     if FONTE.exists():
         dados = json.loads(FONTE.read_text(encoding="utf-8"))
         for cat in dados.get("categorias", []):
