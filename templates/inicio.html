@@ -12,7 +12,9 @@
     </p>
   </div>
   <div class="linha">
-    <a href="{{ url_for('exportar') }}"><button class="secundario">Baixar base (.xlsx)</button></a>
+    <a href="{{ url_for('exportar', **filtros_ativos) }}"><button class="secundario">
+      {% if filtros_ativos %}Baixar o filtrado (.xlsx){% else %}Baixar base (.xlsx){% endif %}
+    </button></a>
     <a href="{{ url_for('nova_ocorrencia') }}"><button>Nova ocorrência</button></a>
   </div>
 </div>

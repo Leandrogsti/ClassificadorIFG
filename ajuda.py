@@ -687,10 +687,13 @@ TELAS["inicio"] = {
          " pergunta que se faz de verdade: 'o que aconteceu em setembro?', e"
          " não 'o que alguém digitou em setembro?'."),
         ("Baixar base",
-         "Gera uma planilha com a base inteira, uma aba por tabela:"
-         " ocorrências, vítimas, notícias, as tabelas complementares e o"
-         " histórico. Serve para análise fora do sistema e para arquivar o"
-         " estado da base num momento determinado."),
+         "Gera uma planilha com uma aba por tabela: ocorrências, vítimas,"
+         " notícias, as tabelas complementares e o histórico. RESPEITA O"
+         " FILTRO da tela — com status ou data marcados, o botão passa a"
+         " dizer 'Baixar o filtrado' e todas as abas saem recortadas juntas,"
+         " sem vítima órfã da ocorrência dela. Sem filtro nenhum, sai a base"
+         " inteira, que é o caso de arquivar o estado da base num momento"
+         " determinado."),
         ("Paginação",
          "Vinte por página. O filtro ativo é mantido ao mudar de página e ao"
          " baixar a planilha — o arquivo sai com o que está na tela, e não com"

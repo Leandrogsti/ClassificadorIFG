@@ -211,25 +211,37 @@ def buscar_ocorrencia(ocorrencia_id: int):
 POR_PAGINA = 20
 
 
+def _clausula_ocorrencia(apelido: str = "o"):
+    """O filtro da tela de ocorrências, em um lugar só.
+
+    Está aqui, e não dentro de `inicio`, porque `/exportar` precisa do MESMO
+    filtro: a planilha que sai com a base inteira enquanto a tela mostra um
+    recorte é um erro silencioso — ninguém confere quatro mil linhas para
+    descobrir que baixou mais do que pediu.
+
+    Devolve a cláusula, os parâmetros, os valores lidos e se há algum filtro
+    ativo (o recorte de unificadas não conta: ele vale sempre).
+    """
+    valores = {chave: request.args.get(chave, "") for chave in ("status", "de", "ate")}
+    filtros = [f"{apelido}.unificada_em IS NULL"]
+    parametros = []
+    if valores["status"]:
+        filtros.append(f"{apelido}.status = ?")
+        parametros.append(valores["status"])
+    if valores["de"]:
+        filtros.append(f"{apelido}.data_caso >= ?")
+        parametros.append(valores["de"])
+    if valores["ate"]:
+        filtros.append(f"{apelido}.data_caso <= ?")
+        parametros.append(valores["ate"])
+    return " AND ".join(filtros), parametros, valores, bool(parametros)
+
+
 @app.route("/")
 def inicio():
     con = conexao()
-    status = request.args.get("status", "")
-    de = request.args.get("de", "")
-    ate = request.args.get("ate", "")
-
-    filtros = ["o.unificada_em IS NULL"]
-    parametros = []
-    if status:
-        filtros.append("o.status = ?")
-        parametros.append(status)
-    if de:
-        filtros.append("o.data_caso >= ?")
-        parametros.append(de)
-    if ate:
-        filtros.append("o.data_caso <= ?")
-        parametros.append(ate)
-    onde = " AND ".join(filtros)
+    onde, parametros, valores, _ = _clausula_ocorrencia()
+    status, de, ate = valores["status"], valores["de"], valores["ate"]
 
     total = con.execute(
         f"SELECT COUNT(*) AS total FROM ocorrencia o WHERE {onde}", parametros
@@ -265,6 +277,8 @@ def inicio():
         status_filtro=status,
         de=de,
         ate=ate,
+        # Sem os vazios, para não sujar a URL do download com status=&de=&ate=
+        filtros_ativos={c: v for c, v in valores.items() if v},
         alertas_abertos=alertas_abertos,
         total=total,
         pagina=pagina,
@@ -382,12 +396,71 @@ def _enviar_planilha(planilha, nome: str):
     )
 
 
+# Como cada tabela exportada se liga à ocorrência. É o que permite recortar a
+# planilha inteira pelo filtro da tela: sem isto, a aba de ocorrências sairia
+# filtrada e as outras viriam completas, o que é pior que não filtrar nada —
+# a planilha passaria a ter vítima sem a ocorrência dela.
+LIGACAO_COM_OCORRENCIA = {
+    "noticia": "ocorrencia_id",
+    "acao_policial": "ocorrencia_id",
+    "crime_organizado": "ocorrencia_id",
+    "vitima_historico": "ocorrencia_id",
+    # Estas penduram na VÍTIMA, não na ocorrência: o recorte passa por ela.
+    "vitimizacao_policial": "via_vitima",
+    "politico_baleado": "via_vitima",
+}
+
+
+def _consulta_exportacao(tabela: str, ids: list[int], tem_filtro: bool):
+    """A consulta de uma aba, já recortada pelas ocorrências que passaram.
+
+    Sem filtro ativo, devolve a tabela inteira — inclusive as que não se ligam
+    a ocorrência nenhuma. Com filtro e nenhuma ocorrência correspondente, a
+    aba sai vazia em vez de sair completa: a planilha tem de dizer a mesma
+    coisa que a tela.
+    """
+    if not tem_filtro:
+        return f"SELECT * FROM {tabela}", []
+    ligacao = LIGACAO_COM_OCORRENCIA.get(tabela)
+    marcas = ",".join("?" * len(ids)) or "NULL"
+    if tabela == "ocorrencia":
+        return f"SELECT * FROM ocorrencia WHERE id IN ({marcas})", list(ids)
+    if tabela == "alerta_duplicidade":
+        # Os DOIS lados do alerta: um par em que só um lado passou no filtro
+        # continua sendo informação sobre a ocorrência que passou.
+        return (
+            f"SELECT * FROM alerta_duplicidade WHERE ocorrencia_id IN ({marcas})"
+            f" OR ocorrencia_similar_id IN ({marcas})",
+            [*ids, *ids],
+        )
+    if ligacao == "via_vitima":
+        return (
+            f"SELECT * FROM {tabela} WHERE vitima_id IN"
+            f" (SELECT id FROM vitima WHERE ocorrencia_id IN ({marcas}))",
+            list(ids),
+        )
+    if ligacao:
+        return f"SELECT * FROM {tabela} WHERE {ligacao} IN ({marcas})", list(ids)
+    return f"SELECT * FROM {tabela}", []
+
+
 @app.route("/exportar")
 def exportar():
-    """Baixa a base inteira como uma planilha, uma aba por tabela."""
+    """Baixa a base como planilha, uma aba por tabela.
+
+    RESPEITA O FILTRO DA TELA de ocorrências (status e datas). Sem filtro
+    nenhum, sai a base inteira — que é o caso de quem quer arquivar o estado
+    da base.
+    """
     from openpyxl import Workbook
 
     con = conexao()
+    onde, parametros, _, tem_filtro = _clausula_ocorrencia()
+    ids = [
+        linha["id"] for linha in con.execute(
+            f"SELECT o.id FROM ocorrencia o WHERE {onde}", parametros
+        )
+    ]
     planilha = Workbook()
     planilha.remove(planilha.active)
 
@@ -395,10 +468,15 @@ def exportar():
         aba = planilha.create_sheet(tabela)
         colunas = [c[1] for c in con.execute(f"PRAGMA table_info({tabela})")]
         aba.append(colunas)
-        for linha in con.execute(f"SELECT * FROM {tabela}"):
+        consulta, valores = _consulta_exportacao(tabela, ids, tem_filtro)
+        for linha in con.execute(consulta, valores):
             aba.append([linha[coluna] for coluna in colunas])
 
-    _aba_de_vitimas(planilha, servico.filtrar_vitimas(con, {}))
+    vitimas = servico.filtrar_vitimas(con, {})
+    if tem_filtro:
+        permitidos = set(ids)
+        vitimas = [v for v in vitimas if v.get("ocorrencia_id") in permitidos]
+    _aba_de_vitimas(planilha, vitimas)
     return _enviar_planilha(planilha, "base-classificador")
 
 
