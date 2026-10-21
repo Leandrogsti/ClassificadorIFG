@@ -62,8 +62,28 @@ from classificador import ErroClassificacao
 
 load_dotenv()
 
+# DESENVOLVIMENTO é opt-in, e não o padrão. Antes a aplicação subia com o
+# console de depuração ligado e uma chave de sessão conhecida: quem alcançasse
+# a porta executava Python arbitrário na máquina. Agora é preciso dizer
+# `FLASK_ENV=development` para ter isso, e o descuido passou a ser não ter o
+# modo de desenvolvimento, em vez de não ter a segurança.
+DESENVOLVIMENTO = os.getenv("FLASK_ENV", "").lower() == "development"
+
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "chave-de-desenvolvimento")
+# A chave assina o cookie de sessão. Com um valor conhecido, qualquer pessoa
+# forja a sessão de outra — e é a sessão que diz quem é o analista que aprova.
+# Fora de desenvolvimento, faltar a chave é erro de partida: subir com uma
+# chave padrão seria pior que não subir.
+_chave = os.getenv("FLASK_SECRET_KEY")
+if not _chave:
+    if not DESENVOLVIMENTO:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY não definida. Defina-a no .env (veja"
+            " .env.example) ou rode com FLASK_ENV=development para usar a"
+            " chave de desenvolvimento."
+        )
+    _chave = "chave-de-desenvolvimento"
+app.secret_key = _chave
 
 # Garante o esquema e as colunas acrescentadas depois, aqui e não só no
 # `__main__`: quem sobe a aplicação por `flask run` não passaria pelo bloco de
@@ -1997,4 +2017,6 @@ def testar_salvar():
 
 if __name__ == "__main__":
     db.iniciar()
-    app.run(debug=True, port=5000)
+    # O console do depurador executa código arbitrário para quem abrir a
+    # página de erro. Só com FLASK_ENV=development.
+    app.run(debug=DESENVOLVIMENTO, port=5000)
