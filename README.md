@@ -609,10 +609,13 @@ commit.
   que quebrariam o alerta de duplicidade e as estatísticas. CRUD em `/locais`.
 - `partidos.json` — siglas de partido para a vítima política. Sigla fora da
   lista é preservada como veio: o TSE muda a lista e o texto não espera.
-- `categorias_fonte.json` — **fora de uso desde 06/10**, quando a motivação saiu
-  do sistema. O que ainda sai dele e viaja no prompt são as seções PAPEL e
-  RECORTE DE ANÁLISE: edite o JSON e rode `python gerar_dicionario.py` para
-  regerar o `dicionario_categorias.txt`. As outras seções do arquivo gerado
+- `categorias_fonte.json` — a lista de categorias está **fora de uso desde
+  06/10**, quando a motivação saiu do sistema. O que ainda sai dele e viaja no
+  prompt são as seções PAPEL e RECORTE DE ANÁLISE, na chave `secoes`: edite-as
+  ali e rode `python gerar_dicionario.py` para regerar o
+  `dicionario_categorias.txt`. Esses dois textos moravam no template Python do
+  script até 19/10/2026, o que dava dois lugares de edição; agora o JSON é o
+  único, e o script recusa rodar sem eles. As outras seções do arquivo gerado
   (as 15 categorias, os dois níveis, as regras de desempate) **não são lidas** —
   ficam como registro do conceito.
 - `ajuda.py` — o texto de ajuda de cada tela e o glossário de 54 termos. É

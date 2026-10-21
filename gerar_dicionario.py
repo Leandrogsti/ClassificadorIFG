@@ -13,9 +13,14 @@ mais. O que ainda sai daqui e e usado em producao sao as secoes PAPEL e RECORTE
 DE ANALISE do prompt, lidas por `classificador._secoes_do_dicionario`. O resto
 do arquivo gerado permanece como registro do conceito.
 
-Para editar as secoes que ainda viajam no prompt, mexa no JSON e rode:
+Para editar as secoes que ainda viajam no prompt (PAPEL e RECORTE DE ANALISE),
+mexa em categorias_fonte.json, na chave "secoes", e rode:
 
     python gerar_dicionario.py
+
+Elas ficam no JSON, e nao no TEMPLATE abaixo, para haver UM lugar de edicao: o
+README sempre mandou editar o JSON, e enquanto esses dois textos moravam aqui
+quem seguia o README nao via efeito nenhum.
 """
 import json
 from pathlib import Path
@@ -74,13 +79,10 @@ def montar_motivacoes_json(nomes: list[str]) -> str:
 
 
 TEMPLATE = """# PAPEL
-Você é analista de curadoria do Instituto Fogo Cruzado. Um classificador BERT já leu a notícia e marcou quais indicadores se aplicam a ela. Você tem duas tarefas, nesta ordem: CONFIRMAR ou DESCARTAR cada indicador marcado e montar a LISTA DE VÍTIMAS. O sistema registra FENÔMENO OBSERVADO e CIRCUNSTÂNCIA, e nada mais — não há campo de motivação para preencher. Seja consistente: mesma dinâmica = mesma classificação. Baseie-se só no texto, sem inventar fatos. Responda SOMENTE com o JSON do FORMATO DE SAÍDA, sem texto antes/depois.
+{papel}
 
 # RECORTE DE ANÁLISE
-Classifique só pelo que envolveu DIRETAMENTE o disparo: quem atirou, contra quem e por quê, no momento do tiro. NÃO use:
-- Fatos ANTERIORES ao tiro que não causaram o tiro (histórico do envolvido, se já era investigado, se era "alvo de operação" em outro momento, antecedentes criminais).
-- Fatos POSTERIORES ao tiro que não são um novo disparo (polícia chegar depois para atender a ocorrência, socorrer vítima, apreender arma/corpo, levar para perícia ou delegacia, abrir inquérito, divulgar identidade).
-Um agente de segurança só conta para acao_policial se esteve presente e atuando NO MOMENTO do disparo (trocando tiros ou sendo alvo). Agente que chega depois só para constatar um crime já encerrado não conta, mesmo que a notícia cite operações, UPP ou unidades policiais em outro contexto.
+{recorte_de_analise}
 
 # DOIS NÍVEIS
 - PRINCIPAL: o fato que ORIGINOU os tiros (sempre exatamente 1). Pergunta-chave: "o que originou os tiros?"
@@ -141,10 +143,24 @@ def main() -> None:
 
     categorias_txt, nomes = montar_categorias(nlp, categorias)
 
+    # PAPEL e RECORTE vêm do JSON, e não daqui: são as duas seções que ainda
+    # viajam no prompt de produção, e o README manda editar o JSON. Mantê-las
+    # no template deste script dava dois lugares de edição — quem seguisse o
+    # README mexia no JSON e nada mudava.
+    secoes = dados.get("secoes") or {}
+    faltando = [c for c in ("papel", "recorte_de_analise") if not secoes.get(c)]
+    if faltando:
+        raise SystemExit(
+            f"{FONTE} está sem a(s) seção(ões) {', '.join(faltando)} em"
+            " 'secoes'. São elas que vão para o prompt de produção."
+        )
+
     texto_final = TEMPLATE.format(
         n=len(nomes),
         categorias=categorias_txt,
         motivacoes_exemplo=montar_motivacoes_json(nomes),
+        papel=secoes["papel"],
+        recorte_de_analise=secoes["recorte_de_analise"],
     )
     SAIDA.write_text(texto_final, encoding="utf-8")
     print(f"OK: {SAIDA} gerado com {len(nomes)} categorias.")
